@@ -1,283 +1,169 @@
-import uvicorn
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional, List
-import uuid, datetime
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from datetime import datetime
 
-app = FastAPI()
+app = Flask(__name__)
+CORS(app)
 
-# Allow CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # change later to GitHub Pages URL
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# In-memory stores
+# Session storage (in-memory, resets on reload)
 applicants = {}
 hrs = {}
 jobs = {}
-applications = {}  # {job_id: [{applicant_email, status, messages:[]}]}
+applications = {}
+messages = {}
 
-# ---------- Applicant ----------
-@app.post("/applicant/register")
-async def applicant_register(
-    name: str = Form(...),
-    age: int = Form(...),
-    gender: str = Form(...),
-    email: str = Form(...),
-    phone: str = Form(...),
-    password: str = Form(...),
-    education: str = Form(...),
-    specialization: str = Form(...),
-    university: str = Form(...),
-    year: int = Form(...),
-    skills: str = Form(...),
-    experience: Optional[int] = Form(0),
-    photo: UploadFile = File(None),
-    resume: UploadFile = File(None),
-):
-    if email in applicants:
-        raise HTTPException(status_code=400, detail="Applicant already registered")
+# ---------- Routes ----------
 
-    applicants[email] = {
-        "id": str(uuid.uuid4()),
-        "name": name,
-        "age": age,
-        "gender": gender,
-        "email": email,
-        "phone": phone,
-        "password": password,
-        "education": education,
-        "specialization": specialization,
-        "university": university,
-        "year": year,
-        "skills": skills.split(","),
-        "experience": experience,
-        "photo": photo.filename if photo else None,
-        "resume": resume.filename if resume else None,
-        "messages": []
+# Applicant Registration
+@app.route("/register_applicant", methods=["POST"])
+def register_applicant():
+    data = request.json
+    email = data.get("email")
+    if not email:
+        return jsonify({"status": "error", "msg": "Email required"}), 400
+    applicants[email] = data
+    return jsonify({"status": "success", "msg": "Applicant registered"}), 200
+
+# Applicant Login
+@app.route("/login_applicant", methods=["POST"])
+def login_applicant():
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
+    if email in applicants and applicants[email]["password"] == password:
+        return jsonify({"status": "success", "msg": "Logged in", "data": applicants[email]}), 200
+    return jsonify({"status": "error", "msg": "Invalid credentials"}), 401
+
+# HR Registration
+@app.route("/register_hr", methods=["POST"])
+def register_hr():
+    data = request.json
+    email = data.get("email")
+    if not email:
+        return jsonify({"status": "error", "msg": "Email required"}), 400
+    hrs[email] = data
+    return jsonify({"status": "success", "msg": "HR registered"}), 200
+
+# HR Login
+@app.route("/login_hr", methods=["POST"])
+def login_hr():
+    data = request.json
+    email = data.get("email")
+    password = data.get("password")
+    if email in hrs and hrs[email]["password"] == password:
+        return jsonify({"status": "success", "msg": "Logged in", "data": hrs[email]}), 200
+    return jsonify({"status": "error", "msg": "Invalid credentials"}), 401
+
+# Post Job
+@app.route("/post_job", methods=["POST"])
+def post_job():
+    data = request.json
+    job_id = str(datetime.now().timestamp()).replace(".", "")
+    data["id"] = job_id
+    data["posted_by"] = data.get("hr_email")
+    jobs[job_id] = data
+    return jsonify({"status": "success", "msg": "Job posted", "job_id": job_id}), 200
+
+# Get Jobs (All active jobs)
+@app.route("/get_jobs", methods=["GET"])
+def get_jobs():
+    now = datetime.now().date()
+    active_jobs = [job for job in jobs.values() if datetime.strptime(job["endDate"], "%Y-%m-%d").date() >= now]
+    return jsonify({"status": "success", "jobs": active_jobs}), 200
+
+# Apply Job
+@app.route("/apply_job", methods=["POST"])
+def apply_job():
+    data = request.json
+    job_id = data.get("job_id")
+    applicant_email = data.get("applicant_email")
+    if not job_id or not applicant_email:
+        return jsonify({"status": "error", "msg": "Missing job_id or applicant_email"}), 400
+    app_id = str(datetime.now().timestamp()).replace(".", "")
+    applications[app_id] = {
+        "id": app_id,
+        "job_id": job_id,
+        "applicant_email": applicant_email,
+        "status": "Viewed"
     }
-    return {"message": "Applicant registered successfully", "applicant": applicants[email]}
+    return jsonify({"status": "success", "msg": "Applied successfully"}), 200
 
+# Get Applied Jobs for Applicant
+@app.route("/get_applied_jobs/<applicant_email>", methods=["GET"])
+def get_applied_jobs(applicant_email):
+    applied = [app for app in applications.values() if app["applicant_email"]==applicant_email]
+    return jsonify({"status": "success", "applied_jobs": applied}), 200
 
-@app.post("/applicant/login")
-async def applicant_login(email: str = Form(...), password: str = Form(...)):
-    if email not in applicants or applicants[email]["password"] != password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"message": "Login successful", "applicant": applicants[email]}
+# Get Applications for HR
+@app.route("/get_applications/<hr_email>", methods=["GET"])
+def get_applications(hr_email):
+    hr_jobs = [job for job in jobs.values() if job.get("hr_email") == hr_email]
+    hr_applications = []
+    for app_id, app in applications.items():
+        if app["job_id"] in [job["id"] for job in hr_jobs]:
+            hr_applications.append(app)
+    return jsonify({"status": "success", "applications": hr_applications}), 200
 
+# Update Application Status (Shortlist / Reject / Viewed)
+@app.route("/update_status", methods=["POST"])
+def update_status():
+    data = request.json
+    app_id = data.get("app_id")
+    status = data.get("status")
+    if app_id in applications:
+        applications[app_id]["status"] = status
+        return jsonify({"status": "success", "msg": "Status updated"}), 200
+    return jsonify({"status": "error", "msg": "Application not found"}), 404
 
-@app.post("/applicant/update")
-async def applicant_update(
-    email: str = Form(...),
-    name: Optional[str] = Form(None),
-    phone: Optional[str] = Form(None),
-    skills: Optional[str] = Form(None),
-    experience: Optional[int] = Form(None),
-):
-    if email not in applicants:
-        raise HTTPException(status_code=404, detail="Applicant not found")
+# Messaging
+@app.route("/send_message", methods=["POST"])
+def send_message():
+    data = request.json
+    key = f"{data.get('from_email')}_{data.get('to_email')}"
+    if key not in messages:
+        messages[key] = []
+    messages[key].append({
+        "from": data.get("from_email"),
+        "to": data.get("to_email"),
+        "message": data.get("message"),
+        "timestamp": str(datetime.now())
+    })
+    return jsonify({"status": "success", "msg": "Message sent"}), 200
 
-    if name: applicants[email]["name"] = name
-    if phone: applicants[email]["phone"] = phone
-    if skills: applicants[email]["skills"] = skills.split(",")
-    if experience is not None: applicants[email]["experience"] = experience
+# Get Messages between two users
+@app.route("/get_messages", methods=["GET"])
+def get_messages():
+    from_email = request.args.get("from_email")
+    to_email = request.args.get("to_email")
+    key1 = f"{from_email}_{to_email}"
+    key2 = f"{to_email}_{from_email}"
+    conv = messages.get(key1, []) + messages.get(key2, [])
+    conv = sorted(conv, key=lambda x: x["timestamp"])
+    return jsonify({"status": "success", "messages": conv}), 200
 
-    return {"message": "Profile updated", "applicant": applicants[email]}
-
-
-@app.get("/applicant/applied-jobs/{email}")
-async def get_applied_jobs(email: str):
-    applied = []
-    for job_id, apps in applications.items():
-        for app in apps:
-            if app["applicant_email"] == email:
-                job_info = jobs[job_id].copy()
-                job_info["status"] = app["status"]
-                applied.append(job_info)
-    return {"applied_jobs": applied}
-
-
-@app.get("/applicant/messages/{email}")
-async def get_messages(email: str):
-    if email not in applicants:
-        raise HTTPException(status_code=404, detail="Applicant not found")
-    return {"messages": applicants[email]["messages"]}
-
-# ---------- HR ----------
-@app.post("/hr/register")
-async def hr_register(
-    company: str = Form(...),
-    name: str = Form(...),
-    age: int = Form(...),
-    email: str = Form(...),
-    phone: str = Form(...),
-    password: str = Form(...),
-    designation: Optional[str] = Form(None),
-    industry: Optional[str] = Form(None),
-    address: Optional[str] = Form(None),
-    photo: UploadFile = File(None),
-):
-    if email in hrs:
-        raise HTTPException(status_code=400, detail="HR already registered")
-
-    hrs[email] = {
-        "id": str(uuid.uuid4()),
-        "company": company,
-        "name": name,
-        "age": age,
-        "email": email,
-        "phone": phone,
-        "password": password,
-        "designation": designation,
-        "industry": industry,
-        "address": address,
-        "photo": photo.filename if photo else None,
-    }
-    return {"message": "HR registered successfully", "hr": hrs[email]}
-
-
-@app.post("/hr/login")
-async def hr_login(email: str = Form(...), password: str = Form(...)):
-    if email not in hrs or hrs[email]["password"] != password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"message": "Login successful", "hr": hrs[email]}
-
-
-# ---------- Jobs ----------
-@app.post("/hr/post-job")
-async def post_job(
-    hr_email: str = Form(...),
-    title: str = Form(...),
-    description: str = Form(...),
-    location: str = Form(...),
-    salary: str = Form(...),
-    skills_required: str = Form(...),
-    experience_required: int = Form(...),
-    end_date: str = Form(...),  # format YYYY-MM-DD
-):
-    if hr_email not in hrs:
-        raise HTTPException(status_code=403, detail="Invalid HR")
-
-    job_id = str(uuid.uuid4())
-    jobs[job_id] = {
-        "id": job_id,
-        "title": title,
-        "description": description,
-        "location": location,
-        "salary": salary,
-        "skills_required": skills_required.split(","),
-        "experience_required": experience_required,
-        "end_date": end_date,
-        "posted_by": hr_email,
-    }
-    return {"message": "Job posted successfully", "job": jobs[job_id]}
-
-
-@app.post("/hr/edit-job")
-async def edit_job(job_id: str = Form(...), title: Optional[str] = Form(None), salary: Optional[str] = Form(None)):
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    if title: jobs[job_id]["title"] = title
-    if salary: jobs[job_id]["salary"] = salary
-
-    return {"message": "Job updated", "job": jobs[job_id]}
-
-
-@app.post("/hr/delete-job")
-async def delete_job(job_id: str = Form(...)):
+# Delete Job
+@app.route("/delete_job", methods=["POST"])
+def delete_job():
+    job_id = request.json.get("job_id")
     if job_id in jobs:
         del jobs[job_id]
-        applications.pop(job_id, None)
-        return {"message": "Job deleted"}
-    raise HTTPException(status_code=404, detail="Job not found")
+        # Remove related applications
+        for app_id in list(applications.keys()):
+            if applications[app_id]["job_id"] == job_id:
+                del applications[app_id]
+        return jsonify({"status": "success", "msg": "Job deleted"}), 200
+    return jsonify({"status": "error", "msg": "Job not found"}), 404
 
+# Edit Job
+@app.route("/edit_job", methods=["POST"])
+def edit_job():
+    data = request.json
+    job_id = data.get("job_id")
+    if job_id in jobs:
+        jobs[job_id].update(data.get("update_data", {}))
+        return jsonify({"status": "success", "msg": "Job updated"}), 200
+    return jsonify({"status": "error", "msg": "Job not found"}), 404
 
-@app.get("/jobs")
-async def get_jobs():
-    today = datetime.date.today()
-    active_jobs = []
-    for job in jobs.values():
-        try:
-            if datetime.date.fromisoformat(job["end_date"]) >= today:
-                active_jobs.append(job)
-        except:
-            active_jobs.append(job)  # if invalid date keep it
-    return {"jobs": active_jobs}
-
-
-# ---------- Applications ----------
-@app.post("/apply-job")
-async def apply_job(applicant_email: str = Form(...), job_id: str = Form(...)):
-    if applicant_email not in applicants:
-        raise HTTPException(status_code=403, detail="Invalid applicant")
-    if job_id not in jobs:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    job = jobs[job_id]
-    applicant = applicants[applicant_email]
-
-    # Requirement check
-    if applicant["experience"] < job["experience_required"]:
-        return {"error": "You cannot apply, experience not matching"}
-
-    if not set(job["skills_required"]).issubset(set(applicant["skills"])):
-        return {"error": "You cannot apply, skills not matching"}
-
-    if job_id not in applications:
-        applications[job_id] = []
-
-    # Prevent duplicate
-    for app in applications[job_id]:
-        if app["applicant_email"] == applicant_email:
-            return {"message": "Already applied"}
-
-    applications[job_id].append({
-        "applicant_email": applicant_email,
-        "status": "Applied",
-        "messages": []
-    })
-    return {"message": "Applied successfully"}
-
-
-@app.get("/applications/{job_id}")
-async def get_applications(job_id: str):
-    if job_id not in applications:
-        return {"applications": []}
-    return {"applications": applications[job_id]}
-
-
-@app.post("/hr/update-status")
-async def update_status(job_id: str = Form(...), applicant_email: str = Form(...), status: str = Form(...)):
-    if job_id not in applications:
-        raise HTTPException(status_code=404, detail="No applications for this job")
-
-    for app in applications[job_id]:
-        if app["applicant_email"] == applicant_email:
-            app["status"] = status
-            return {"message": f"Status updated to {status}"}
-    raise HTTPException(status_code=404, detail="Application not found")
-
-
-@app.post("/hr/message")
-async def send_message(job_id: str = Form(...), applicant_email: str = Form(...), hr_email: str = Form(...), message: str = Form(...)):
-    if applicant_email not in applicants:
-        raise HTTPException(status_code=404, detail="Applicant not found")
-
-    msg = {"from": hr_email, "job_id": job_id, "message": message}
-    applicants[applicant_email]["messages"].append(msg)
-
-    # also track inside application
-    for app in applications.get(job_id, []):
-        if app["applicant_email"] == applicant_email:
-            app["messages"].append(msg)
-
-    return {"message": "Message sent"}
-    
-
+# ---------------------------
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    app.run(debug=True)
