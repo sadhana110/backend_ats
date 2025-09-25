@@ -1,82 +1,73 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
-import uuid
+import os
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # Allow cross-origin requests from frontend
 
-applicants = {}
-hrs = {}
-jobs = {}
-applications = {}
+# ---- In-memory storage ----
+users = []
+jobs = []
 
-@app.route("/")
-def home(): return "Backend is running"
-
-# Applicant Register
-@app.route("/register/applicant", methods=["POST"])
-def register_applicant():
+# ---- User Routes ----
+@app.route('/register', methods=['POST'])
+def register():
     data = request.json
-    email = data.get("email")
-    if email in applicants: return jsonify({"error":"Applicant exists"}),400
-    applicants[email]=data
-    return jsonify({"message":"Applicant registered"})
+    if not data.get('email') or not data.get('password') or not data.get('role'):
+        return jsonify({'error': 'Missing fields'}), 400
+    if any(u['email'] == data['email'] for u in users):
+        return jsonify({'error': 'Email already exists'}), 400
+    users.append(data)
+    return jsonify({'message': 'Registered successfully', 'user': data})
 
-# HR Register
-@app.route("/register/hr", methods=["POST"])
-def register_hr():
+@app.route('/login', methods=['POST'])
+def login():
     data = request.json
-    email = data.get("email")
-    if email in hrs: return jsonify({"error":"HR exists"}),400
-    hrs[email]=data
-    return jsonify({"message":"HR registered"})
+    user = next((u for u in users if u['email'] == data.get('email') 
+                 and u['password'] == data.get('password') 
+                 and u['role'] == data.get('role')), None)
+    if user:
+        return jsonify({'message': 'Login successful', 'user': user})
+    return jsonify({'error': 'Invalid credentials'}), 401
 
-# Applicant Login
-@app.route("/login/applicant", methods=["POST"])
-def login_applicant():
-    data = request.json
-    email,password = data.get("email"),data.get("password")
-    if email in applicants and applicants[email]["password"]==password:
-        return jsonify({"message":"Login successful"})
-    return jsonify({"error":"Invalid credentials"}),401
+# ---- Job Routes ----
+@app.route('/jobs', methods=['GET'])
+def get_jobs():
+    return jsonify(jobs)
 
-# HR Login
-@app.route("/login/hr", methods=["POST"])
-def login_hr():
-    data = request.json
-    email,password = data.get("email"),data.get("password")
-    if email in hrs and hrs[email]["password"]==password:
-        return jsonify({"message":"Login successful"})
-    return jsonify({"error":"Invalid credentials"}),401
-
-# Post Job
-@app.route("/jobs", methods=["POST"])
+@app.route('/jobs', methods=['POST'])
 def post_job():
     data = request.json
-    job_id = str(uuid.uuid4())
-    jobs[job_id] = {"id":job_id, **data}
-    return jsonify({"message":"Job posted","id":job_id})
+    job = {
+        'id': str(len(jobs) + 1),
+        'title': data.get('title'),
+        'company': data.get('company'),
+        'location': data.get('location'),
+        'experience': data.get('experience'),
+        'type': data.get('type'),
+        'salary': data.get('salary'),
+        'description': data.get('description'),
+        'applied': []
+    }
+    jobs.append(job)
+    return jsonify({'message': 'Job posted', 'job': job})
 
-# Get Jobs
-@app.route("/jobs", methods=["GET"])
-def get_jobs():
-    return jsonify(list(jobs.values()))
-
-# Apply Job
-@app.route("/apply", methods=["POST"])
-def apply_job():
+@app.route('/jobs/<job_id>/apply', methods=['POST'])
+def apply_job(job_id):
     data = request.json
-    job_id,email = data.get("job_id"),data.get("email")
-    key=(job_id,email)
-    if key in applications: return jsonify({"error":"Already applied"}),400
-    applications[key]=data
-    return jsonify({"message":"Applied successfully"})
+    email = data.get('email')
+    user = next((u for u in users if u['email'] == email and u['role'] == 'applicant'), None)
+    if not user:
+        return jsonify({'error': 'Applicant not found'}), 404
+    job = next((j for j in jobs if j['id'] == job_id), None)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+    if email in job['applied']:
+        return jsonify({'message': 'Already applied'})
+    job['applied'].append(email)
+    return jsonify({'message': 'Applied successfully', 'job': job})
 
-# View Applied Jobs
-@app.route("/applied/<email>", methods=["GET"])
-def view_applied(email):
-    result = [v for (jid,em),v in applications.items() if em==email]
-    return jsonify(result)
-
-if __name__=="__main__":
-    app.run(debug=True)
+# ---- Run Server ----
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))  # Dynamic port for Render
+    app.run(host='0.0.0.0', port=port)
