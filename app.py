@@ -1,157 +1,139 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import uuid
-import datetime
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
 
-# ===============================
-# In-Memory Storage (No Database)
-# ===============================
-candidates = {}
-recruiters = {}
-jobs = {}
-applications = {}
+# In-memory storage
+candidates = []
+recruiters = []
+admins = [{"email":"admin@naukri.com","password":"admin123"}]
+jobs = []
+applications = []
 messages = []
 reports = []
-admin = {"email": "admin@naukri.com", "password": "admin123"}
 
-# ===============================
-# Utility Functions
-# ===============================
-def generate_id():
-    return str(uuid.uuid4())
-
-# ===============================
-# Candidate APIs
-# ===============================
+# ====== Registration ======
 @app.route("/register_candidate", methods=["POST"])
 def register_candidate():
     data = request.json
-    cid = generate_id()
-    candidates[cid] = data
-    candidates[cid]["id"] = cid
-    return jsonify({"message": "Candidate registered successfully", "id": cid})
+    data["_id"] = str(len(candidates)+1)
+    candidates.append(data)
+    return jsonify({"success":True,"message":"Candidate registered successfully"})
 
-@app.route("/login_candidate", methods=["POST"])
-def login_candidate():
-    data = request.json
-    for cid, c in candidates.items():
-        if c["email"] == data["email"] and c["password"] == data["password"]:
-            return jsonify({"message": "Login success", "id": cid})
-    return jsonify({"message": "Invalid credentials"}), 401
-
-@app.route("/candidates/<cid>", methods=["GET"])
-def get_candidate(cid):
-    return jsonify(candidates.get(cid, {}))
-
-# ===============================
-# Recruiter APIs
-# ===============================
 @app.route("/register_recruiter", methods=["POST"])
 def register_recruiter():
     data = request.json
-    rid = generate_id()
-    recruiters[rid] = data
-    recruiters[rid]["id"] = rid
-    return jsonify({"message": "Recruiter registered successfully", "id": rid})
+    data["_id"] = str(len(recruiters)+1)
+    recruiters.append(data)
+    return jsonify({"success":True,"message":"Recruiter registered successfully"})
 
-@app.route("/login_recruiter", methods=["POST"])
-def login_recruiter():
+# ====== Login ======
+@app.route("/login", methods=["POST"])
+def login():
     data = request.json
-    for rid, r in recruiters.items():
-        if r["email"] == data["email"] and r["password"] == data["password"]:
-            return jsonify({"message": "Login success", "id": rid})
-    return jsonify({"message": "Invalid credentials"}), 401
+    role = data.get("role")
+    email = data.get("email")
+    password = data.get("password")
+    user = None
+    if role=="candidate":
+        user = next((c for c in candidates if c["email"]==email and c["password"]==password), None)
+    elif role=="recruiter":
+        user = next((r for r in recruiters if r["email"]==email and r["password"]==password), None)
+    elif role=="admin":
+        user = next((a for a in admins if a["email"]==email and a["password"]==password), None)
+    if user:
+        return jsonify({"success":True,"user":user})
+    else:
+        return jsonify({"success":False,"message":"Invalid credentials"})
 
-# ===============================
-# Admin APIs
-# ===============================
-@app.route("/login_admin", methods=["POST"])
-def login_admin():
-    data = request.json
-    if data["email"] == admin["email"] and data["password"] == admin["password"]:
-        return jsonify({"message": "Admin login success"})
-    return jsonify({"message": "Invalid admin credentials"}), 401
-
-@app.route("/admin_stats", methods=["GET"])
-def admin_stats():
-    return jsonify({
-        "total_candidates": len(candidates),
-        "total_recruiters": len(recruiters),
-        "total_reports": len(reports)
-    })
-
-@app.route("/admin_reports", methods=["GET"])
-def admin_reports():
-    return jsonify(reports)
-
-@app.route("/admin_ban/<rid>", methods=["POST"])
-def admin_ban(rid):
-    if rid in recruiters:
-        del recruiters[rid]
-    # remove jobs
-    for jid in list(jobs.keys()):
-        if jobs[jid]["recruiter_id"] == rid:
-            del jobs[jid]
-    return jsonify({"message": "Recruiter banned"})
-
-# ===============================
-# Job Posting APIs
-# ===============================
+# ====== Jobs ======
 @app.route("/post_job", methods=["POST"])
 def post_job():
     data = request.json
-    jid = generate_id()
-    data["id"] = jid
-    jobs[jid] = data
-    return jsonify({"message": "Job posted", "id": jid})
+    data["_id"] = str(len(jobs)+1)
+    data["posted"] = datetime.now().isoformat()
+    data["status"] = "active"
+    jobs.append(data)
+    return jsonify({"success":True,"message":"Job posted successfully"})
 
-@app.route("/jobs", methods=["GET"])
+@app.route("/jobs")
 def get_jobs():
-    return jsonify(list(jobs.values()))
+    return jsonify([j for j in jobs if j["status"]=="active"])
 
-@app.route("/apply_job", methods=["POST"])
-def apply_job():
+@app.route("/recruiter_jobs/<rid>")
+def recruiter_jobs(rid):
+    return jsonify([j for j in jobs if j["recruiterId"]==rid])
+
+@app.route("/delete_job", methods=["POST"])
+def delete_job():
     data = request.json
-    aid = generate_id()
-    applications[aid] = data
-    applications[aid]["id"] = aid
-    return jsonify({"message": "Applied successfully", "id": aid})
+    job = next((j for j in jobs if j["_id"]==data["jobId"]), None)
+    if job: jobs.remove(job)
+    return jsonify({"success":True,"message":"Job deleted"})
 
-@app.route("/applications/<jid>", methods=["GET"])
-def get_applications(jid):
-    return jsonify([a for a in applications.values() if a["job_id"] == jid])
-
-# ===============================
-# Messaging & Reports
-# ===============================
-@app.route("/send_message", methods=["POST"])
-def send_message():
+# ====== Apply/Save Jobs ======
+@app.route("/apply", methods=["POST"])
+def apply():
     data = request.json
-    msg = {
-        "from": data["from"],
-        "to": data["to"],
-        "text": data["text"],
-        "timestamp": str(datetime.datetime.now())
-    }
-    messages.append(msg)
-    return jsonify({"message": "Message sent"})
+    applications.append({"_id":str(len(applications)+1),"candidateId":data["candidateId"],"jobId":data["jobId"],"status":"applied"})
+    return jsonify({"success":True,"message":"Applied successfully"})
 
-@app.route("/messages/<uid>", methods=["GET"])
-def get_messages(uid):
-    return jsonify([m for m in messages if m["to"] == uid or m["from"] == uid])
+@app.route("/save_job", methods=["POST"])
+def save_job():
+    data = request.json
+    candidate = next((c for c in candidates if c["_id"]==data["candidateId"]), None)
+    if "saved_jobs" not in candidate: candidate["saved_jobs"]=[]
+    candidate["saved_jobs"].append(data["jobId"])
+    return jsonify({"success":True,"message":"Job saved successfully"})
 
+@app.route("/applicants/<jobId>")
+def applicants(jobId):
+    apps = [a for a in applications if a["jobId"]==jobId]
+    res=[]
+    for app in apps:
+        candidate = next((c for c in candidates if c["_id"]==app["candidateId"]), None)
+        if candidate: res.append(candidate)
+    return jsonify(res)
+
+# ====== Shortlist/Reject ======
+@app.route("/shortlist", methods=["POST"])
+def shortlist():
+    data = request.json
+    app_obj = next((a for a in applications if a["candidateId"]==data["candidateId"] and a["jobId"]==data["jobId"]), None)
+    if app_obj: app_obj["status"]="shortlisted"
+    return jsonify({"success":True,"message":"Candidate shortlisted"})
+
+@app.route("/reject", methods=["POST"])
+def reject():
+    data = request.json
+    app_obj = next((a for a in applications if a["candidateId"]==data["candidateId"] and a["jobId"]==data["jobId"]), None)
+    if app_obj: app_obj["status"]="rejected"
+    return jsonify({"success":True,"message":"Candidate rejected"})
+
+# ====== Admin Stats ======
+@app.route("/admin_stats")
+def admin_stats():
+    return jsonify({"candidates":len(candidates),"recruiters":len(recruiters),"jobs":len(jobs),"reports":len(reports)})
+
+# ====== Messaging (simple example) ======
+@app.route("/message", methods=["POST"])
+def message():
+    data = request.json
+    data["_id"]=str(len(messages)+1)
+    data["timestamp"]=datetime.now().isoformat()
+    messages.append(data)
+    return jsonify({"success":True,"message":"Message sent"})
+
+# ====== Reports ======
 @app.route("/report", methods=["POST"])
 def report():
-    data = request.json
-    data["id"] = generate_id()
+    data=request.json
+    data["_id"]=str(len(reports)+1)
     reports.append(data)
-    return jsonify({"message": "Report submitted"})
+    return jsonify({"success":True,"message":"Reported successfully"})
 
-# ===============================
-# Run App
-# ===============================
-if __name__ == "__main__":
-    app.run(debug=True)
+# ====== Run App ======
+if __name__=="__main__":
+    app.run(host="0.0.0.0", port=5000)
