@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,13 +9,14 @@
   <style>
     .hidden { display: none; }
     body { padding-top: 70px; }
+    .card { box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
   </style>
 </head>
 <body>
   <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
     <div class="container">
-      <a class="navbar-brand" href="#">JobPortal</a>
+      <a class="navbar-brand fw-bold" href="#">JobPortal</a>
       <div class="collapse navbar-collapse">
         <ul class="navbar-nav ms-auto">
           <li class="nav-item"><a id="navHome" class="nav-link" href="#">Home</a></li>
@@ -30,13 +32,13 @@
   <!-- Sections -->
   <div class="container">
     <!-- Landing -->
-    <div id="landingSection" class="mt-5">
-      <h2 class="text-center">Welcome to Job Portal</h2>
-      <p class="text-center">Find jobs or hire the best candidates!</p>
+    <div id="landingSection" class="mt-5 text-center">
+      <h2>Welcome to Job Portal</h2>
+      <p>Find jobs or hire the best candidates!</p>
     </div>
 
     <!-- Login -->
-    <div id="loginSection" class="hidden mt-5">
+    <div id="loginSection" class="hidden mt-5 col-md-6 mx-auto">
       <h3>Login</h3>
       <form id="loginForm">
         <input type="email" id="loginEmail" class="form-control mb-2" placeholder="Email" required>
@@ -46,29 +48,29 @@
           <option value="recruiter">Recruiter</option>
           <option value="admin">Admin</option>
         </select>
-        <button type="submit" class="btn btn-primary">Login</button>
+        <button type="submit" class="btn btn-primary w-100">Login</button>
       </form>
     </div>
 
     <!-- Candidate Register -->
-    <div id="candidateRegisterSection" class="hidden mt-5">
+    <div id="candidateRegisterSection" class="hidden mt-5 col-md-6 mx-auto">
       <h3>Candidate Register</h3>
       <form id="candidateForm">
-        <input type="text" id="c_name" class="form-control mb-2" placeholder="Name">
-        <input type="email" id="c_email" class="form-control mb-2" placeholder="Email">
-        <input type="password" id="c_password" class="form-control mb-2" placeholder="Password">
-        <button class="btn btn-success" type="submit">Register</button>
+        <input type="text" id="c_name" class="form-control mb-2" placeholder="Name" required>
+        <input type="email" id="c_email" class="form-control mb-2" placeholder="Email" required>
+        <input type="password" id="c_password" class="form-control mb-2" placeholder="Password" required>
+        <button class="btn btn-success w-100" type="submit">Register</button>
       </form>
     </div>
 
     <!-- Recruiter Register -->
-    <div id="recruiterRegisterSection" class="hidden mt-5">
+    <div id="recruiterRegisterSection" class="hidden mt-5 col-md-6 mx-auto">
       <h3>Recruiter Register</h3>
       <form id="recruiterForm">
-        <input type="text" id="r_name" class="form-control mb-2" placeholder="Name">
-        <input type="email" id="r_email" class="form-control mb-2" placeholder="Email">
-        <input type="password" id="r_password" class="form-control mb-2" placeholder="Password">
-        <button class="btn btn-success" type="submit">Register</button>
+        <input type="text" id="r_name" class="form-control mb-2" placeholder="Name" required>
+        <input type="email" id="r_email" class="form-control mb-2" placeholder="Email" required>
+        <input type="password" id="r_password" class="form-control mb-2" placeholder="Password" required>
+        <button class="btn btn-success w-100" type="submit">Register</button>
       </form>
     </div>
 
@@ -76,7 +78,12 @@
     <div id="candidateDashboard" class="hidden mt-5">
       <h3>Candidate Dashboard</h3>
       <p>Welcome, <span id="candidateName"></span>!</p>
+      <h5>Available Jobs</h5>
       <div id="jobList"></div>
+      <h5 class="mt-4">Saved Jobs</h5>
+      <div id="savedJobs"></div>
+      <h5 class="mt-4">Applied Jobs</h5>
+      <div id="appliedJobs"></div>
     </div>
 
     <!-- Recruiter Dashboard -->
@@ -86,18 +93,21 @@
       <form id="jobPostForm" class="mb-3">
         <input type="text" id="jobTitle" class="form-control mb-2" placeholder="Job Title" required>
         <input type="text" id="jobDesc" class="form-control mb-2" placeholder="Description" required>
-        <button class="btn btn-primary">Post Job</button>
+        <button class="btn btn-primary w-100">Post Job</button>
       </form>
+      <h5>Your Jobs</h5>
       <div id="recruiterJobs"></div>
     </div>
 
     <!-- Admin Dashboard -->
     <div id="adminDashboard" class="hidden mt-5">
       <h3>Admin Dashboard</h3>
-      <div id="adminContent"></div>
+      <canvas id="adminChart" width="400" height="200"></canvas>
+      <div id="adminUsers" class="mt-3"></div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="spa.js"></script>
 </body>
 </html>
