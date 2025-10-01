@@ -33,8 +33,12 @@ def post_job():
     jobs.append(data)
     return jsonify({"success":True})
 
-@app.route("/jobs") def get_jobs(): return jsonify(jobs)
-@app.route("/recruiter_jobs/<rid>") def recruiter_jobs(rid): return jsonify([j for j in jobs if j["recruiterId"]==rid])
+@app.route("/jobs") 
+def get_jobs():
+    return jsonify(jobs)
+@app.route("/recruiter_jobs/<rid>")
+def recruiter_jobs(rid):
+    return jsonify([j for j in jobs if j["recruiterId"]==rid])
 
 @app.route("/apply", methods=["POST"])
 def apply():
@@ -51,6 +55,7 @@ def admin_stats():
     return jsonify({"candidates":len(candidates),"recruiters":len(recruiters),"jobs":len(jobs),"reports":len(reports)})
 
 @app.route("/users")
-def users(): return jsonify(candidates+recruiters+admins)
+def users(): 
+    return jsonify(candidates+recruiters+admins)
 
 if __name__=="__main__": app.run(host="0.0.0.0",port=5000)
