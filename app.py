@@ -1,154 +1,145 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from datetime import datetime, timedelta
+from datetime import datetime
+import uuid
 
 app = Flask(__name__)
-CORS(app)
+CORS(app)  # allow cross-origin requests
 
-# In-memory storage
-users = []
-jobs = []
-applications = []
-messages = []
-interviews = []
-admin_reports = []
+# ------------------ IN-MEMORY DATA ------------------
+users = []        # {id,name,email,password,role,extra_info}
+jobs = []         # {id,title,description,location,expiryDate,recruiterId}
+applications = [] # {id,candidateId,jobId,status}
+shortlisted = []  # {id,candidateId,jobId}
+messages = []     # {id,fromId,toId,message,date}
+interviews = []   # {id,candidateId,jobId,dateTime,status}
 
-# Utility functions
-def find_user(email):
-    for u in users:
-        if u['email'] == email:
-            return u
-    return None
+# ------------------ HELPER ------------------
+def find_user(email, role):
+    return next((u for u in users if u['email']==email and u['role']==role), None)
 
 def find_job(job_id):
-    for j in jobs:
-        if j['id'] == job_id:
-            return j
-    return None
+    return next((j for j in jobs if j['id']==job_id), None)
 
-def auto_expire_jobs():
-    global jobs
-    now = datetime.now()
-    jobs = [j for j in jobs if j['end_date'] >= now]
-
-# Routes
-
-# Registration
+# ------------------ AUTH ------------------
 @app.route('/register', methods=['POST'])
 def register():
     data = request.json
-    if find_user(data['email']):
-        return jsonify({'status':'fail','message':'Email already exists'})
+    if find_user(data['email'], data['role']):
+        return jsonify({'message':'User already exists'}), 400
     user = {
-        'id': len(users)+1,
-        'role': data['role'],
+        'id': str(uuid.uuid4()),
+        'name': data.get('name',''),
         'email': data['email'],
         'password': data['password'],
-        'details': data['details'], # All candidate/recruiter registration info
+        'role': data['role'],
+        'extra_info': data.get('extra_info',{})
     }
     users.append(user)
-    return jsonify({'status':'success','message':'Registered successfully'})
+    return jsonify({'message':'Registered successfully'}), 201
 
-# Login
 @app.route('/login', methods=['POST'])
 def login():
     data = request.json
-    user = find_user(data['email'])
-    if user and user['password'] == data['password'] and user['role'] == data['role']:
-        return jsonify({'status':'success','user': user})
-    return jsonify({'status':'fail','message':'Invalid credentials'})
+    user = find_user(data['email'], data['role'])
+    if user and user['password']==data['password']:
+        return jsonify({'message':'Login success','user':user}), 200
+    return jsonify({'message':'Invalid credentials'}), 401
 
-# Post Job (Recruiter)
-@app.route('/post_job', methods=['POST'])
-def post_job():
-    data = request.json
-    job = {
-        'id': len(jobs)+1,
-        'recruiter_email': data['recruiter_email'],
-        'title': data['title'],
-        'description': data['description'],
-        'skills': data['skills'],
-        'location': data['location'],
-        'end_date': datetime.strptime(data['end_date'], '%Y-%m-%d'),
-    }
-    jobs.append(job)
-    return jsonify({'status':'success','job': job})
+# ------------------ JOBS ------------------
+@app.route('/jobs', methods=['GET','POST'])
+def job_handler():
+    if request.method=='POST':
+        data = request.json
+        job = {
+            'id': str(uuid.uuid4()),
+            'title': data['title'],
+            'description': data['description'],
+            'location': data['location'],
+            'expiryDate': data['expiryDate'],
+            'recruiterId': data['recruiterId']
+        }
+        jobs.append(job)
+        return jsonify({'message':'Job posted','job':job}), 201
+    # GET
+    now = datetime.now().strftime('%Y-%m-%d')
+    active_jobs = [j for j in jobs if j['expiryDate']>=now]
+    return jsonify(active_jobs)
 
-# Get all jobs
-@app.route('/jobs', methods=['GET'])
-def get_jobs():
-    auto_expire_jobs()
-    return jsonify({'jobs': jobs})
+# ------------------ APPLICATIONS ------------------
+@app.route('/applications', methods=['GET','POST'])
+def applications_handler():
+    if request.method=='POST':
+        data = request.json
+        applications.append({
+            'id': str(uuid.uuid4()),
+            'candidateId': data['candidateId'],
+            'jobId': data['jobId'],
+            'status': 'applied'
+        })
+        return jsonify({'message':'Applied'}),201
+    userId = request.args.get('userId')
+    user_apps = []
+    for app_ in applications:
+        if app_['candidateId']==userId:
+            job = find_job(app_['jobId'])
+            user_apps.append({
+                'jobTitle': job['title'] if job else '',
+                'status': app_['status'],
+                'recruiterName': next((u['name'] for u in users if u['id']==job['recruiterId']), '') if job else ''
+            })
+    return jsonify(user_apps)
 
-# Apply Job (Candidate)
-@app.route('/apply', methods=['POST'])
-def apply_job():
-    data = request.json
-    applications.append({
-        'job_id': data['job_id'],
-        'candidate_email': data['candidate_email'],
-        'status': 'applied'
-    })
-    return jsonify({'status':'success'})
+# ------------------ SHORTLISTED ------------------
+@app.route('/shortlisted', methods=['GET','POST'])
+def shortlist_handler():
+    userId = request.args.get('userId')
+    user_short = []
+    for s in shortlisted:
+        if s['candidateId']==userId:
+            job = find_job(s['jobId'])
+            user_short.append({
+                'jobTitle': job['title'] if job else '',
+                'recruiterName': next((u['name'] for u in users if u['id']==job['recruiterId']), '') if job else ''
+            })
+    return jsonify(user_short)
 
-# Shortlist/Reject
-@app.route('/update_application', methods=['POST'])
-def update_application():
-    data = request.json
-    for app_obj in applications:
-        if app_obj['job_id'] == data['job_id'] and app_obj['candidate_email'] == data['candidate_email']:
-            app_obj['status'] = data['status'] # shortlisted / rejected
-            return jsonify({'status':'success'})
-    return jsonify({'status':'fail','message':'Application not found'})
+# ------------------ MESSAGES ------------------
+@app.route('/messages', methods=['GET','POST'])
+def messages_handler():
+    if request.method=='POST':
+        data = request.json
+        messages.append({
+            'id': str(uuid.uuid4()),
+            'fromId': data['fromId'],
+            'toId': data['toId'],
+            'message': data['message'],
+            'date': datetime.now().isoformat()
+        })
+        return jsonify({'message':'Message sent'}),201
+    userId = request.args.get('userId')
+    user_msgs = [ {**m,'fromName':next((u['name'] for u in users if u['id']==m['fromId']), '')} 
+                  for m in messages if m['toId']==userId]
+    return jsonify(user_msgs)
 
-# Schedule Interview
-@app.route('/schedule_interview', methods=['POST'])
-def schedule_interview():
-    data = request.json
-    interviews.append({
-        'job_id': data['job_id'],
-        'candidate_email': data['candidate_email'],
-        'recruiter_email': data['recruiter_email'],
-        'date_time': data['date_time'],
-        'venue': data['venue'],
-        'status': 'scheduled'
-    })
-    return jsonify({'status':'success'})
+# ------------------ INTERVIEWS ------------------
+@app.route('/interviews', methods=['POST','GET'])
+def interviews_handler():
+    if request.method=='POST':
+        data = request.json
+        interviews.append({
+            'id': str(uuid.uuid4()),
+            'candidateId': data['candidateId'],
+            'jobId': data['jobId'],
+            'dateTime': data['dateTime'],
+            'status': 'scheduled'
+        })
+        return jsonify({'message':'Interview scheduled'}),201
+    userId = request.args.get('userId')
+    user_interviews = [i for i in interviews if i['candidateId']==userId or 
+                       any(j['id']==i['jobId'] and j['recruiterId']==userId for j in jobs)]
+    return jsonify(user_interviews)
 
-# Messaging
-@app.route('/send_message', methods=['POST'])
-def send_message():
-    data = request.json
-    messages.append({
-        'from': data['from'],
-        'to': data['to'],
-        'message': data['message'],
-        'timestamp': datetime.now().isoformat()
-    })
-    return jsonify({'status':'success'})
-
-@app.route('/get_messages', methods=['GET'])
-def get_messages():
-    user_email = request.args.get('email')
-    user_msgs = [m for m in messages if m['to'] == user_email or m['from'] == user_email]
-    return jsonify({'messages': user_msgs})
-
-# Admin: Ban / Investigate
-@app.route('/admin_action', methods=['POST'])
-def admin_action():
-    data = request.json
-    user = find_user(data['email'])
-    if not user:
-        return jsonify({'status':'fail','message':'User not found'})
-    if data['action'] == 'ban':
-        users.remove(user)
-        # Remove their jobs if recruiter
-        global jobs
-        jobs = [j for j in jobs if j['recruiter_email'] != data['email']]
-    elif data['action'] == 'investigate':
-        user['investigating'] = True
-    return jsonify({'status':'success'})
-
-# Run server
-if __name__ == '__main__':
+# ------------------ RUN ------------------
+if __name__=='__main__':
     app.run(debug=True)
