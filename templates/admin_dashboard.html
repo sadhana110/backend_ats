@@ -1,30 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin Dashboard</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-<h1>Admin Dashboard</h1>
-<nav>
-    <button onclick="showSection('stats')">Stats</button>
-    <button onclick="showSection('recruiters')">Recruiters</button>
-    <button onclick="showSection('candidates')">Candidates</button>
-    <button onclick="showSection('reports')">Reports</button>
-    <button onclick="showSection('messages')">Messages</button>
-    <button onclick="logout()">Logout</button>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="#">JobPortal Admin</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+      </ul>
+    </div>
+  </div>
 </nav>
-</header>
-<main>
-    <section id="stats" class="dashboard-section"></section>
-    <section id="recruiters" class="dashboard-section"></section>
-    <section id="candidates" class="dashboard-section"></section>
-    <section id="reports" class="dashboard-section"></section>
-    <section id="messages" class="dashboard-section"></section>
-</main>
-<script src="js/admin_dashboard.js"></script>
+
+<div class="container mt-4">
+    <h2>Welcome, <span id="adminName"></span></h2>
+
+    <div class="row my-3 text-center">
+        <div class="col-md-2 m-1"><button class="btn btn-primary w-100" onclick="showTab('recruiters')">Recruiters</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-success w-100" onclick="showTab('candidates')">Candidates</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-warning w-100" onclick="showTab('reports')">Reports</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-info w-100" onclick="showTab('messages')">Messages</button></div>
+    </div>
+
+    <div id="dashboardContent" class="row mt-4"></div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+const user = JSON.parse(localStorage.getItem('user'));
+if(!user || user.role!=='admin') window.location='login.html';
+document.getElementById('adminName').innerText = user.name;
+
+function logout(){
+    localStorage.removeItem('user');
+    window.location='login.html';
+}
+
+function showTab(tab){
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='<p class="text-center">Loading...</p>';
+
+    if(tab==='recruiters') loadRecruiters();
+    else if(tab==='candidates') loadCandidates();
+    else if(tab==='reports') loadReports();
+    else if(tab==='messages') loadMessages();
+}
+
+// -------------------- RECRUITERS --------------------
+async function loadRecruiters(){
+    const res = await fetch(`${BASE_URL}/users?role=recruiter`);
+    const recruiters = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!recruiters || recruiters.length===0){ container.innerHTML='<p>No recruiters</p>'; return;}
+    recruiters.forEach(r=>{
+        const card = document.createElement('div');
+        card.className='col-md-4 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>Name:</strong> ${r.name}</p>
+            <p><strong>Email:</strong> ${r.email}</p>
+            <p><strong>Company:</strong> ${r.company}</p>
+            <button class="btn btn-danger btn-sm" onclick="banUser(${r.id})">Ban</button>
+            <button class="btn btn-warning btn-sm" onclick="investigateUser(${r.id})">Investigate</button>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+// -------------------- CANDIDATES --------------------
+async function loadCandidates(){
+    const res = await fetch(`${BASE_URL}/users?role=candidate`);
+    const candidates = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!candidates || candidates.length===0){ container.innerHTML='<p>No candidates</p>'; return;}
+    candidates.forEach(c=>{
+        const card = document.createElement('div');
+        card.className='col-md-4 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>Name:</strong> ${c.name}</p>
+            <p><strong>Email:</strong> ${c.email}</p>
+            <button class="btn btn-danger btn-sm" onclick="banUser(${c.id})">Ban</button>
+            <button class="btn btn-warning btn-sm" onclick="investigateUser(${c.id})">Investigate</button>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+// -------------------- REPORTS --------------------
+async function loadReports(){
+    const res = await fetch(`${BASE_URL}/reports`);
+    const reports = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!reports || reports.length===0){ container.innerHTML='<p>No reports</p>'; return;}
+    reports.forEach(r=>{
+        const card = document.createElement('div');
+        card.className='col-md-6 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>Candidate:</strong> ${r.candidateName}</p>
+            <p><strong>Company:</strong> ${r.company}</p>
+            <p><strong>Job:</strong> ${r.jobTitle}</p>
+            <p><strong>Report:</strong> ${r.report}</p>
+            <button class="btn btn-primary btn-sm" onclick="resolveReport(${r.id})">Action Taken</button>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+async function resolveReport(reportId){
+    const res = await fetch(`${BASE_URL}/reports/${reportId}/resolve`,{method:'POST'});
+    if(res.ok) { alert('Report resolved'); loadReports(); }
+}
+
+// -------------------- MESSAGES --------------------
+async function loadMessages(){
+    const res = await fetch(`${BASE_URL}/messages?userId=${user.id}`);
+    const data = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!data.messages || data.messages.length===0){ container.innerHTML='<p>No messages</p>'; return;}
+    data.messages.forEach(msg=>{
+        const card = document.createElement('div');
+        card.className='col-md-6 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>From:</strong> ${msg.fromName}</p>
+            <p>${msg.message}</p>
+            <p><small>${new Date(msg.date).toLocaleString()}</small></p>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+// -------------------- ADMIN ACTIONS --------------------
+async function banUser(userId){
+    if(!confirm('Ban this user?')) return;
+    const res = await fetch(`${BASE_URL}/users/${userId}/ban`,{method:'POST'});
+    if(res.ok) { alert('User banned'); loadRecruiters(); loadCandidates(); }
+}
+
+async function investigateUser(userId){
+    const res = await fetch(`${BASE_URL}/users/${userId}/investigate`,{method:'POST'});
+    if(res.ok) { alert('User under investigation'); loadRecruiters(); loadCandidates(); }
+}
+</script>
 </body>
 </html>
