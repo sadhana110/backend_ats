@@ -1,32 +1,216 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Recruiter Dashboard</title>
-<link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <title>Recruiter Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<header>
-<h1>Recruiter Dashboard</h1>
-<nav>
-    <button onclick="showSection('profile')">Profile</button>
-    <button onclick="showSection('postJob')">Post Job</button>
-    <button onclick="showSection('manageJob')">Manage Jobs</button>
-    <button onclick="showSection('applications')">Applications</button>
-    <button onclick="showSection('shortlisted')">Shortlisted</button>
-    <button onclick="showSection('messages')">Messages</button>
-    <button onclick="logout()">Logout</button>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+  <div class="container">
+    <a class="navbar-brand" href="#">JobPortal</a>
+    <div class="collapse navbar-collapse">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link" href="#" onclick="logout()">Logout</a></li>
+      </ul>
+    </div>
+  </div>
 </nav>
-</header>
-<main>
-    <section id="profile" class="dashboard-section"></section>
-    <section id="postJob" class="dashboard-section"></section>
-    <section id="manageJob" class="dashboard-section"></section>
-    <section id="applications" class="dashboard-section"></section>
-    <section id="shortlisted" class="dashboard-section"></section>
-    <section id="messages" class="dashboard-section"></section>
-</main>
-<script src="js/recruiter_dashboard.js"></script>
+
+<div class="container mt-4">
+    <h2>Welcome, <span id="recruiterName"></span></h2>
+
+    <div class="row my-3 text-center">
+        <div class="col-md-2 m-1"><button class="btn btn-primary w-100" onclick="showTab('postJob')">Post Job</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-success w-100" onclick="showTab('manageJobs')">Manage Jobs</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-warning w-100" onclick="showTab('applications')">Applications</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-info w-100" onclick="showTab('shortlisted')">Shortlisted</button></div>
+        <div class="col-md-2 m-1"><button class="btn btn-secondary w-100" onclick="showTab('messages')">Messages</button></div>
+    </div>
+
+    <div id="dashboardContent" class="row mt-4"></div>
+</div>
+
+<script src="js/main.js"></script>
+<script>
+const user = JSON.parse(localStorage.getItem('user'));
+if(!user || user.role!=='recruiter') window.location='login.html';
+document.getElementById('recruiterName').innerText = user.name;
+
+function logout(){
+    localStorage.removeItem('user');
+    window.location='login.html';
+}
+
+function showTab(tab){
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='<p class="text-center">Loading...</p>';
+
+    if(tab==='postJob') loadPostJobForm();
+    else if(tab==='manageJobs') loadManageJobs();
+    else if(tab==='applications') loadApplications();
+    else if(tab==='shortlisted') loadShortlistedApplicants();
+    else if(tab==='messages') loadMessages();
+}
+
+// -------------------- POST JOB --------------------
+function loadPostJobForm(){
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML=`
+    <div class="col-md-12">
+        <div class="card p-4 shadow">
+            <h4>Post New Job</h4>
+            <form id="postJobForm">
+                <div class="mb-3"><input type="text" id="title" class="form-control" placeholder="Job Title" required></div>
+                <div class="mb-3"><input type="text" id="company" class="form-control" placeholder="Company Name" required></div>
+                <div class="mb-3"><input type="text" id="location" class="form-control" placeholder="Location" required></div>
+                <div class="mb-3"><input type="text" id="role" class="form-control" placeholder="Role" required></div>
+                <div class="mb-3"><textarea id="description" class="form-control" placeholder="Job Description" required></textarea></div>
+                <div class="mb-3"><input type="date" id="endDate" class="form-control" placeholder="Application End Date" required></div>
+                <button type="submit" class="btn btn-primary">Post Job</button>
+            </form>
+        </div>
+    </div>`;
+    document.getElementById('postJobForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const data={
+            title: document.getElementById('title').value,
+            company: document.getElementById('company').value,
+            location: document.getElementById('location').value,
+            role: document.getElementById('role').value,
+            description: document.getElementById('description').value,
+            endDate: document.getElementById('endDate').value,
+            recruiterId: user.id
+        };
+        const res = await fetch(`${BASE_URL}/jobs`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify(data)
+        });
+        if(res.ok){ alert('Job posted successfully!'); loadManageJobs(); }
+        else alert('Error posting job.');
+    });
+}
+
+// -------------------- MANAGE JOBS --------------------
+async function loadManageJobs(){
+    const res = await fetch(`${BASE_URL}/recruiters/${user.id}/jobs`);
+    const jobs = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!jobs || jobs.length===0){ container.innerHTML='<p>No jobs posted yet</p>'; return;}
+    jobs.forEach(job=>{
+        const card = document.createElement('div');
+        card.className='col-md-6 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <h5>${job.title}</h5>
+            <p>Company: ${job.company}</p>
+            <p>Location: ${job.location}</p>
+            <p>End Date: ${new Date(job.endDate).toLocaleDateString()}</p>
+            <button class="btn btn-warning btn-sm" onclick="editJob(${job.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteJob(${job.id})">Delete</button>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+async function editJob(jobId){
+    alert('Edit Job feature coming soon'); 
+}
+
+async function deleteJob(jobId){
+    if(!confirm('Are you sure you want to delete this job?')) return;
+    const res = await fetch(`${BASE_URL}/jobs/${jobId}`,{method:'DELETE'});
+    if(res.ok){ alert('Job deleted'); loadManageJobs(); }
+}
+
+// -------------------- APPLICATIONS --------------------
+async function loadApplications(){
+    const res = await fetch(`${BASE_URL}/recruiters/${user.id}/applications`);
+    const apps = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!apps || apps.length===0){ container.innerHTML='<p>No applications yet</p>'; return;}
+    apps.forEach(app=>{
+        const card = document.createElement('div');
+        card.className='col-md-6 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>Candidate:</strong> ${app.candidateName}</p>
+            <p><strong>Job:</strong> ${app.jobTitle}</p>
+            <p>Status: ${app.status}</p>
+            ${app.status==='applied' ? `<button class="btn btn-success btn-sm" onclick="shortlistApplicant(${app.id})">Shortlist</button>` : ''}
+            ${app.status==='applied' ? `<button class="btn btn-danger btn-sm" onclick="rejectApplicant(${app.id})">Reject</button>` : ''}
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+async function shortlistApplicant(appId){
+    const res = await fetch(`${BASE_URL}/applications/${appId}/shortlist`,{method:'POST'});
+    if(res.ok){ alert('Candidate shortlisted'); loadApplications(); }
+}
+async function rejectApplicant(appId){
+    const res = await fetch(`${BASE_URL}/applications/${appId}/reject`,{method:'POST'});
+    if(res.ok){ alert('Candidate rejected'); loadApplications(); }
+}
+
+// -------------------- SHORTLISTED --------------------
+async function loadShortlistedApplicants(){
+    const res = await fetch(`${BASE_URL}/recruiters/${user.id}/shortlisted`);
+    const apps = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!apps || apps.length===0){ container.innerHTML='<p>No shortlisted applicants</p>'; return;}
+    apps.forEach(app=>{
+        const card = document.createElement('div');
+        card.className='col-md-6 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>Candidate:</strong> ${app.candidateName}</p>
+            <p><strong>Job:</strong> ${app.jobTitle}</p>
+            <p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>
+            <button class="btn btn-info btn-sm" onclick="sendMessage(${app.candidateId})">Message</button>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+// -------------------- MESSAGES --------------------
+async function loadMessages(){
+    const res = await fetch(`${BASE_URL}/messages?userId=${user.id}`);
+    const data = await res.json();
+    const container = document.getElementById('dashboardContent');
+    container.innerHTML='';
+    if(!data.messages || data.messages.length===0){ container.innerHTML='<p>No messages</p>'; return;}
+    data.messages.forEach(msg=>{
+        const card = document.createElement('div');
+        card.className='col-md-6 mb-3';
+        card.innerHTML=`
+        <div class="card p-3 shadow hover-card">
+            <p><strong>From:</strong> ${msg.fromName}</p>
+            <p>${msg.message}</p>
+            <p><small>${new Date(msg.date).toLocaleString()}</small></p>
+        </div>`;
+        container.appendChild(card);
+    });
+}
+
+// -------------------- SEND MESSAGE --------------------
+function sendMessage(candidateId){
+    const message = prompt('Enter your message:');
+    if(!message) return;
+    fetch(`${BASE_URL}/messages`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({from:user.id,to:candidateId,message})
+    }).then(res=>{
+        if(res.ok) alert('Message sent');
+        else alert('Failed to send message');
+    });
+}
+</script>
 </body>
 </html>
