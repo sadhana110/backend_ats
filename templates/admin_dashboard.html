@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Admin Dashboard</h1>
+<nav>
+    <button onclick="showSection('stats')">Stats</button>
+    <button onclick="showSection('recruiters')">Recruiters</button>
+    <button onclick="showSection('candidates')">Candidates</button>
+    <button onclick="showSection('reports')">Reports</button>
+    <button onclick="showSection('messages')">Messages</button>
+    <button onclick="logout()">Logout</button>
+</nav>
+</header>
+<main>
+    <section id="stats" class="dashboard-section"></section>
+    <section id="recruiters" class="dashboard-section"></section>
+    <section id="candidates" class="dashboard-section"></section>
+    <section id="reports" class="dashboard-section"></section>
+    <section id="messages" class="dashboard-section"></section>
+</main>
+<script src="js/admin_dashboard.js"></script>
+</body>
+</html>

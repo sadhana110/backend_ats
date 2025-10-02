@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recruiter Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>Recruiter Dashboard</h1>
+<nav>
+    <button onclick="showSection('profile')">Profile</button>
+    <button onclick="showSection('postJob')">Post Job</button>
+    <button onclick="showSection('manageJob')">Manage Jobs</button>
+    <button onclick="showSection('applications')">Applications</button>
+    <button onclick="showSection('shortlisted')">Shortlisted</button>
+    <button onclick="showSection('messages')">Messages</button>
+    <button onclick="logout()">Logout</button>
+</nav>
+</header>
+<main>
+    <section id="profile" class="dashboard-section"></section>
+    <section id="postJob" class="dashboard-section"></section>
+    <section id="manageJob" class="dashboard-section"></section>
+    <section id="applications" class="dashboard-section"></section>
+    <section id="shortlisted" class="dashboard-section"></section>
+    <section id="messages" class="dashboard-section"></section>
+</main>
+<script src="js/recruiter_dashboard.js"></script>
+</body>
+</html>
