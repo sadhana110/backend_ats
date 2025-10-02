@@ -85,30 +85,62 @@ async function loadProfile(){
 }
 
 // -------------------- JOB POSTING --------------------
-async function showJobPostForm(){
+async function loadPostJobForm(){
     const container = document.getElementById('dashboardContent');
     container.innerHTML=`
-        <form id="jobForm">
-            <input type="text" name="title" placeholder="Job Title" required class="form-control mb-2">
-            <input type="text" name="description" placeholder="Job Description" required class="form-control mb-2">
-            <input type="text" name="location" placeholder="Location" required class="form-control mb-2">
-            <input type="date" name="expiryDate" required class="form-control mb-2">
-            <button type="submit" class="btn btn-success">Post Job</button>
-        </form>
-    `;
-    document.getElementById('jobForm').addEventListener('submit', async e=>{
+    <div class="col-md-12">
+        <div class="card p-4 shadow">
+            <h4>Post New Job</h4>
+            <form id="postJobForm">
+                <div class="mb-3"><input type="text" id="title" class="form-control" placeholder="Job Title" required></div>
+                <div class="mb-3"><input type="text" id="company" class="form-control" placeholder="Company Name" required></div>
+                <div class="mb-3"><input type="text" id="location" class="form-control" placeholder="Location" required></div>
+                <div class="mb-3"><input type="text" id="role" class="form-control" placeholder="Role" required></div>
+                <div class="mb-3"><textarea id="description" class="form-control" placeholder="Job Description" required></textarea></div>
+                <div class="mb-3"><input type="date" id="expiryDate" class="form-control" placeholder="Application End Date" required></div>
+                <button type="submit" class="btn btn-primary">Post Job</button>
+            </form>
+        </div>
+    </div>`;
+
+    document.getElementById('postJobForm').addEventListener('submit', async (e)=>{
         e.preventDefault();
-        const data = Object.fromEntries(new FormData(e.target));
-        data.recruiterId = JSON.parse(localStorage.getItem('user')).id;
-        const res = await fetch(`${BASE_URL}/jobs`,{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify(data)
-        });
-        if(res.ok){ alert('Job posted'); loadJobs(); } 
-        else alert('Error posting job');
+
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+        if(!currentUser) return alert("You must be logged in as recruiter!");
+
+        const data={
+            title: document.getElementById('title').value,
+            company: document.getElementById('company').value,
+            location: document.getElementById('location').value,
+            role: document.getElementById('role').value,
+            description: document.getElementById('description').value,
+            expiryDate: document.getElementById('expiryDate').value, // corrected
+            recruiterId: currentUser.id
+        };
+
+        try {
+            const res = await fetch(`${BASE_URL}/jobs`,{
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(data)
+            });
+
+            const result = await res.json();
+
+            if(res.ok){
+                alert(result.message || 'Job posted successfully!');
+                loadJobs(); // reload job list
+            } else {
+                alert('Error posting job: ' + (result.message || 'Unknown error'));
+            }
+        } catch(err){
+            console.error(err);
+            alert('Server error: Cannot connect to backend');
+        }
     });
 }
+
 
 async function loadJobs(){
     const res = await fetch(`${BASE_URL}/jobs`);
