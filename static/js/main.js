@@ -2,24 +2,33 @@
 const BASE_URL = "https://backend-ats-z0tb.onrender.com";
 
 // -------------------- AUTH --------------------
-async function registerUser(formId){
-    const form = document.getElementById(formId);
-    const data = Object.fromEntries(new FormData(form));
+async function registerUser() {
+    const name = document.getElementById("name").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value.trim();
+    const role = document.getElementById("role").value;
+
+    // You can add extra info like education later
+    const extra_info = {};
+
     try {
         const res = await fetch(`${BASE_URL}/register`, {
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify(data)
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name, email, password, role, extra_info})
         });
-        const result = await res.json();
-        if(res.ok){
-            alert('Registration successful! Login now.');
-            window.location='login.html';
+
+        const data = await res.json();
+
+        if (res.ok) {
+            alert(data.message);
+            window.location.href = "login.html";
         } else {
-            alert('Error: '+result.message);
+            alert("Error: " + data.message);
         }
-    } catch(err){
-        alert('Server error');
+    } catch (err) {
+        console.error(err);
+        alert("Server error: Cannot connect to backend");
     }
 }
 
