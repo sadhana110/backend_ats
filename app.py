@@ -1,243 +1,142 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from datetime import datetime
-import uuid
 
 app = Flask(__name__)
 CORS(app)
+
+# In-memory SQLite DB (replace with PostgreSQL/MySQL later)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///naukri_clone.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# -------------------- Models --------------------
+# -------------------- MODELS --------------------
 class User(db.Model):
-    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = db.Column(db.String(100))
-    email = db.Column(db.String(100), unique=True)
-    password = db.Column(db.String(100))
-    role = db.Column(db.String(20))  # candidate, recruiter, admin
-    phone = db.Column(db.String(20))
-    company = db.Column(db.String(100))
-    skills = db.Column(db.String(500))
-    resume = db.Column(db.Text)
-    description = db.Column(db.Text)
+    id = db.Column(db.Integer, primary_key=True)
+    role = db.Column(db.String(50))  # candidate, recruiter, admin
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
     banned = db.Column(db.Boolean, default=False)
-    investigated = db.Column(db.Boolean, default=False)
 
 class Job(db.Model):
-    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(100))
-    recruiter_id = db.Column(db.String)
-    skills = db.Column(db.String(500))
-    last_date = db.Column(db.Date)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    description = db.Column(db.Text)
+    recruiter_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    status = db.Column(db.String(20), default="open")  # open/closed
 
 class Application(db.Model):
-    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    candidate_id = db.Column(db.String)
-    job_id = db.Column(db.String)
-    status = db.Column(db.String(20), default='applied')  # applied, shortlisted, rejected
-    interview_date = db.Column(db.DateTime)
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('job.id'))
+    candidate_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    status = db.Column(db.String(20), default="applied")  # applied/shortlisted/rejected
 
 class Message(db.Model):
-    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    sender_id = db.Column(db.String)
-    receiver_id = db.Column(db.String)
-    content = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    content = db.Column(db.Text, nullable=False)
+    timestamp = db.Column(db.DateTime, default=db.func.current_timestamp())
 
-class Report(db.Model):
-    id = db.Column(db.String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    reporter_id = db.Column(db.String)
-    reported_id = db.Column(db.String)
-    job_id = db.Column(db.String)
-    content = db.Column(db.Text)
-
-db.create_all()
-
-# -------------------- Auth --------------------
-@app.route('/register', methods=['POST'])
+# -------------------- AUTH --------------------
+@app.route("/register", methods=["POST"])
 def register():
     data = request.json
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({"message":"Email already exists"}), 400
-    user = User(
-        name=data['name'],
-        email=data['email'],
-        password=data['password'],
-        role=data['role'],
-        phone=data.get('phone',''),
-        company=data.get('company',''),
-        skills=','.join(data.get('skills',[])),
-        resume=data.get('resume',''),
-        description=data.get('description','')
-    )
-    db.session.add(user)
-    db.session.commit()
-    return jsonify({"message":"Registered successfully"})
+    if User.query.filter_by(username=data["username"]).first():
+        return jsonify({"error": "Username already exists"}), 400
 
-@app.route('/login', methods=['POST'])
+    new_user = User(
+        role=data["role"],
+        username=data["username"],
+        password=data["password"],  # ⚠️ hash later
+        email=data["email"]
+    )
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({"message": "Registered successfully"}), 201
+
+@app.route("/login", methods=["POST"])
 def login():
     data = request.json
-    user = User.query.filter_by(email=data['email'], password=data['password']).first()
+    user = User.query.filter_by(username=data["username"], password=data["password"]).first()
     if not user:
-        return jsonify({"message":"Invalid credentials"}), 401
+        return jsonify({"error": "Invalid credentials"}), 401
     if user.banned:
-        return jsonify({"message":"You are banned"}), 403
-    return jsonify({
-        "id": user.id,
-        "name": user.name,
-        "role": user.role
-    })
+        return jsonify({"error": "User banned by admin"}), 403
+    return jsonify({"id": user.id, "role": user.role, "username": user.username})
 
-# -------------------- Jobs --------------------
-@app.route('/job/post', methods=['POST'])
+# -------------------- JOBS --------------------
+@app.route("/jobs", methods=["POST"])
 def post_job():
     data = request.json
-    job = Job(
-        title=data['title'],
-        recruiter_id=data['recruiterId'],
-        skills=','.join(data.get('skills',[])),
-        last_date=datetime.strptime(data['lastDate'], '%Y-%m-%d').date()
-    )
+    job = Job(title=data["title"], description=data["description"], recruiter_id=data["recruiter_id"])
     db.session.add(job)
     db.session.commit()
-    return jsonify({"message":"Job posted successfully"})
+    return jsonify({"message": "Job posted successfully"}), 201
 
-@app.route('/recruiter/<recruiter_id>/jobs')
-def recruiter_jobs(recruiter_id):
-    jobs = Job.query.filter_by(recruiter_id=recruiter_id).all()
-    return jsonify([{
-        "id": j.id,
-        "title": j.title,
-        "skills": j.skills.split(","),
-        "last_date": j.last_date.isoformat()
-    } for j in jobs])
+@app.route("/jobs", methods=["GET"])
+def list_jobs():
+    jobs = Job.query.filter_by(status="open").all()
+    return jsonify([{"id": j.id, "title": j.title, "description": j.description, "recruiter_id": j.recruiter_id} for j in jobs])
 
-@app.route('/job/delete', methods=['POST'])
-def delete_job():
-    data = request.json
-    job = Job.query.get(data['jobId'])
-    if job:
-        db.session.delete(job)
-        db.session.commit()
-        return jsonify({"message":"Job deleted"})
-    return jsonify({"message":"Job not found"}), 404
-
-@app.route('/jobs')
-def all_jobs():
-    jobs = Job.query.all()
-    result = []
-    today = datetime.utcnow().date()
-    for j in jobs:
-        if j.last_date < today:
-            db.session.delete(j)
-        else:
-            result.append({
-                "id": j.id,
-                "title": j.title,
-                "skills": j.skills.split(",")
-            })
-    db.session.commit()
-    return jsonify(result)
-
-# -------------------- Applications --------------------
-@app.route('/apply', methods=['POST'])
+# -------------------- APPLICATIONS --------------------
+@app.route("/apply", methods=["POST"])
 def apply_job():
     data = request.json
-    if Application.query.filter_by(candidate_id=data['candidateId'], job_id=data['jobId']).first():
-        return jsonify({"message":"Already applied"}), 400
-    app_job = Application(candidate_id=data['candidateId'], job_id=data['jobId'])
-    db.session.add(app_job)
+    existing = Application.query.filter_by(job_id=data["job_id"], candidate_id=data["candidate_id"]).first()
+    if existing:
+        return jsonify({"error": "Already applied"}), 400
+    appn = Application(job_id=data["job_id"], candidate_id=data["candidate_id"])
+    db.session.add(appn)
     db.session.commit()
-    return jsonify({"message":"Applied successfully"})
+    return jsonify({"message": "Applied successfully"}), 201
 
-@app.route('/applications/<recruiter_id>')
-def recruiter_applications(recruiter_id):
-    jobs = Job.query.filter_by(recruiter_id=recruiter_id).all()
-    job_ids = [j.id for j in jobs]
-    apps = Application.query.filter(Application.job_id.in_(job_ids)).all()
-    result = []
-    for a in apps:
-        candidate = User.query.get(a.candidate_id)
-        job = Job.query.get(a.job_id)
-        result.append({
-            "applicationId": a.id,
-            "candidateName": candidate.name,
-            "jobTitle": job.title,
-            "status": a.status
-        })
-    return jsonify(result)
+@app.route("/applications/<int:job_id>", methods=["GET"])
+def view_applicants(job_id):
+    apps = Application.query.filter_by(job_id=job_id).all()
+    return jsonify([{"id": a.id, "candidate_id": a.candidate_id, "status": a.status} for a in apps])
 
-@app.route('/application/update', methods=['POST'])
-def update_application():
-    data = request.json
-    app_job = Application.query.get(data['applicationId'])
-    if not app_job:
-        return jsonify({"message":"Application not found"}), 404
-    app_job.status = data['status']
-    db.session.commit()
-    return jsonify({"message":"Application updated"})
+@app.route("/myapplications/<int:candidate_id>", methods=["GET"])
+def my_applications(candidate_id):
+    apps = Application.query.filter_by(candidate_id=candidate_id).all()
+    return jsonify([{"job_id": a.job_id, "status": a.status} for a in apps])
 
-# -------------------- Messages --------------------
-@app.route('/message/send', methods=['POST'])
+# -------------------- MESSAGING --------------------
+@app.route("/messages", methods=["POST"])
 def send_message():
     data = request.json
-    msg = Message(sender_id=data['senderId'], receiver_id=data['receiverId'], content=data['content'])
+    msg = Message(sender_id=data["sender_id"], receiver_id=data["receiver_id"], content=data["content"])
     db.session.add(msg)
     db.session.commit()
-    return jsonify({"message":"Message sent"})
+    return jsonify({"message": "Message sent"}), 201
 
-@app.route('/messages/<user_id>')
-def get_messages(user_id):
-    msgs = Message.query.filter((Message.sender_id==user_id)|(Message.receiver_id==user_id)).all()
-    return jsonify([{
-        "id": m.id,
-        "senderId": m.sender_id,
-        "receiverId": m.receiver_id,
-        "content": m.content,
-        "created_at": m.created_at.isoformat()
-    } for m in msgs])
+@app.route("/messages/<int:user1>/<int:user2>", methods=["GET"])
+def get_messages(user1, user2):
+    msgs = Message.query.filter(
+        ((Message.sender_id == user1) & (Message.receiver_id == user2)) |
+        ((Message.sender_id == user2) & (Message.receiver_id == user1))
+    ).order_by(Message.timestamp.asc()).all()
 
-# -------------------- Admin --------------------
-@app.route('/admin/stats')
-def admin_stats():
-    total = User.query.count()
-    candidates = User.query.filter_by(role='candidate').count()
-    recruiters = User.query.filter_by(role='recruiter').count()
-    return jsonify({"totalUsers": total, "totalCandidates": candidates, "totalRecruiters": recruiters})
+    return jsonify([{"sender": m.sender_id, "receiver": m.receiver_id, "content": m.content, "timestamp": m.timestamp} for m in msgs])
 
-@app.route('/admin/recruiters')
-def admin_recruiters():
-    users = User.query.filter_by(role='recruiter').all()
-    return jsonify([{"id":u.id,"name":u.name,"company":u.company} for u in users])
+# -------------------- ADMIN --------------------
+@app.route("/admin/users", methods=["GET"])
+def admin_users():
+    users = User.query.all()
+    return jsonify([{"id": u.id, "username": u.username, "role": u.role, "banned": u.banned} for u in users])
 
-@app.route('/admin/candidates')
-def admin_candidates():
-    users = User.query.filter_by(role='candidate').all()
-    return jsonify([{"id":u.id,"name":u.name,"skills":u.skills.split(",")} for u in users])
+@app.route("/admin/ban/<int:user_id>", methods=["POST"])
+def admin_ban(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    user.banned = True
+    db.session.commit()
+    return jsonify({"message": "User banned"}), 200
 
-@app.route('/admin/ban', methods=['POST'])
-def admin_ban():
-    data = request.json
-    user = User.query.get(data['userId'])
-    if user:
-        user.banned = True
-        db.session.commit()
-        return jsonify({"message":"User banned"})
-    return jsonify({"message":"User not found"}), 404
-
-@app.route('/admin/investigate', methods=['POST'])
-def admin_investigate():
-    data = request.json
-    user = User.query.get(data['userId'])
-    if user:
-        user.investigated = True
-        db.session.commit()
-        return jsonify({"message":"User under investigation"})
-    return jsonify({"message":"User not found"}), 404
-
-# -------------------- Run --------------------
+# -------------------- INIT --------------------
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
