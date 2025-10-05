@@ -78,24 +78,33 @@ async function loadAllJobs(){
 }
 
 // -------------------- APPLY JOB --------------------
-async function applyJob(jobId, jobTitle, recruiterId){
+async function applyJob(jobId, jobTitle, recruiterId) {
     const payload = {
         candidateId: user.id,
         candidateName: user.name,
-        jobId: jobId,
-        jobTitle: jobTitle,
-        recruiterId: recruiterId
+        jobId,
+        jobTitle,
+        recruiterId
     };
 
-    const res = await fetch(`${BASE_URL}/apply`, {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body: JSON.stringify(payload)
-    });
+    try {
+        const res = await fetch(`${BASE_URL}/apply`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
 
-    if(res.ok) alert('Applied successfully!');
-    else alert('Error applying for job.');
+        if (res.ok) {
+            alert("✅ " + data.message);
+        } else {
+            alert("⚠️ " + data.message);
+        }
+    } catch (err) {
+        alert("❌ Server error while applying");
+    }
 }
+
 
 // -------------------- APPLIED JOBS --------------------
 async function loadAppliedJobs(){
