@@ -127,7 +127,7 @@ async function loadManageJobs(){
             <h5>${job.title}</h5>
             <p>Company: ${job.company}</p>
             <p>Location: ${job.location}</p>
-            <p>End Date: ${new Date(job.endDate).toLocaleDateString()}</p>
+            <p>End Date: ${new Date(job.expiryDate).toLocaleDateString()}</p>
             <button class="btn btn-warning btn-sm" onclick="editJob(${job.id})">Edit</button>
             <button class="btn btn-danger btn-sm" onclick="deleteJob(${job.id})">Delete</button>
         </div>`;
