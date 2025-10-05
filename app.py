@@ -127,6 +127,17 @@ def shortlisted_applicants(recruiter_id):
     shortlisted = [a for a in applications if a['recruiterId'] == recruiter_id and a['status'] == 'shortlisted']
     return jsonify(shortlisted)
 
+@app.route('/candidates/<candidate_id>/applications', methods=['GET'])
+def candidate_applications(candidate_id):
+    apps = [a for a in applications if a['candidateId'] == candidate_id]
+    return jsonify(apps)
+
+@app.route('/candidates/<candidate_id>/shortlisted', methods=['GET'])
+def candidate_shortlisted(candidate_id):
+    shortlisted = [a for a in applications if a['candidateId'] == candidate_id and a['status'] == 'shortlisted']
+    return jsonify(shortlisted)
+
+
 
 # -------------------- MESSAGES --------------------
 @app.route('/messages', methods=['GET', 'POST'])
