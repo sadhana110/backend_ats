@@ -66,6 +66,19 @@ def job_handler():
     active_jobs = [j for j in jobs if j['expiryDate']>=now]
     return jsonify(active_jobs)
 
+@app.route('/recruiters/<recruiter_id>/jobs', methods=['GET'])
+def recruiter_jobs(recruiter_id):
+    recruiter_jobs = [j for j in jobs if j['recruiterId'] == recruiter_id]
+    return jsonify(recruiter_jobs)
+
+@app.route('/jobs/<job_id>', methods=['DELETE'])
+def delete_job(job_id):
+    global jobs
+    jobs = [j for j in jobs if j['id'] != job_id]
+    return jsonify({'message': 'Job deleted'}), 200
+
+
+
 # ------------------ APPLICATIONS ------------------
 @app.route('/applications', methods=['GET','POST'])
 def applications_handler():
