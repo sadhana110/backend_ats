@@ -77,6 +77,79 @@ def delete_job(job_id):
     jobs = [j for j in jobs if j['id'] != job_id]
     return jsonify({'message': 'Job deleted'}), 200
 
+# -------------------- APPLICATIONS --------------------
+applications = []
+messages = []
+
+@app.route('/apply', methods=['POST'])
+def apply_job():
+    data = request.json
+    application = {
+        'id': str(uuid.uuid4()),
+        'candidateId': data['candidateId'],
+        'candidateName': data['candidateName'],
+        'jobId': data['jobId'],
+        'jobTitle': data['jobTitle'],
+        'recruiterId': data['recruiterId'],
+        'status': 'applied'
+    }
+    applications.append(application)
+    return jsonify({'message': 'Application submitted', 'application': application}), 201
+
+
+@app.route('/recruiters/<recruiter_id>/applications', methods=['GET'])
+def recruiter_applications(recruiter_id):
+    apps = [a for a in applications if a['recruiterId'] == recruiter_id]
+    return jsonify(apps)
+
+
+@app.route('/applications/<app_id>/shortlist', methods=['POST'])
+def shortlist_application(app_id):
+    for app in applications:
+        if app['id'] == app_id:
+            app['status'] = 'shortlisted'
+            app['interviewDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            return jsonify({'message': 'Applicant shortlisted'}), 200
+    return jsonify({'message': 'Application not found'}), 404
+
+
+@app.route('/applications/<app_id>/reject', methods=['POST'])
+def reject_application(app_id):
+    for app in applications:
+        if app['id'] == app_id:
+            app['status'] = 'rejected'
+            return jsonify({'message': 'Applicant rejected'}), 200
+    return jsonify({'message': 'Application not found'}), 404
+
+
+@app.route('/recruiters/<recruiter_id>/shortlisted', methods=['GET'])
+def shortlisted_applicants(recruiter_id):
+    shortlisted = [a for a in applications if a['recruiterId'] == recruiter_id and a['status'] == 'shortlisted']
+    return jsonify(shortlisted)
+
+
+# -------------------- MESSAGES --------------------
+@app.route('/messages', methods=['GET', 'POST'])
+def handle_messages():
+    if request.method == 'POST':
+        data = request.json
+        message = {
+            'id': str(uuid.uuid4()),
+            'from': data['from'],
+            'to': data['to'],
+            'message': data['message'],
+            'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        messages.append(message)
+        return jsonify({'message': 'Message sent'}), 201
+
+    # GET
+    user_id = request.args.get('userId')
+    user_messages = [m for m in messages if m['to'] == user_id or m['from'] == user_id]
+    return jsonify({'messages': user_messages})
+
+
+
 
 
 # ------------------ APPLICATIONS ------------------
