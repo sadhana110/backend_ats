@@ -30,7 +30,6 @@
 
     <div id="dashboardContent" class="row mt-4"></div>
 </div>
-
 <script src="js/main.js"></script>
 <script>
 const user = JSON.parse(localStorage.getItem('user'));
@@ -58,7 +57,10 @@ async function loadAllJobs(){
     const jobs = await res.json();
     const container = document.getElementById('dashboardContent');
     container.innerHTML='';
-    if(!jobs || jobs.length===0){ container.innerHTML='<p>No jobs available</p>'; return;}
+    if(!jobs || jobs.length===0){ 
+        container.innerHTML='<p>No jobs available</p>'; 
+        return;
+    }
 
     jobs.forEach(job=>{
         const card = document.createElement('div');
@@ -66,44 +68,55 @@ async function loadAllJobs(){
         card.innerHTML=`
         <div class="card p-3 shadow hover-card">
             <h5>${job.title}</h5>
-            <p>Company: ${job.company}</p>
-            <p>Role: ${job.role}</p>
-            <p>Location: ${job.location}</p>
-            <p>Last Date: ${new Date(job.endDate).toLocaleDateString()}</p>
-            <button class="btn btn-primary btn-sm" onclick="applyJob(${job.id})">Apply</button>
+            <p><strong>Location:</strong> ${job.location}</p>
+            <p><strong>Role:</strong> ${job.role}</p>
+            <p><strong>Ends:</strong> ${new Date(job.expiryDate).toLocaleDateString()}</p>
+            <button class="btn btn-primary btn-sm" onclick="applyJob('${job.id}','${job.title}','${job.recruiterId}')">Apply</button>
         </div>`;
         container.appendChild(card);
     });
 }
 
-// -------------------- APPLY JOBS --------------------
-async function applyJob(jobId){
-    const res = await fetch(`${BASE_URL}/jobs/${jobId}/apply`, {
+// -------------------- APPLY JOB --------------------
+async function applyJob(jobId, jobTitle, recruiterId){
+    const payload = {
+        candidateId: user.id,
+        candidateName: user.name,
+        jobId: jobId,
+        jobTitle: jobTitle,
+        recruiterId: recruiterId
+    };
+
+    const res = await fetch(`${BASE_URL}/apply`, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({userId:user.id})
+        body: JSON.stringify(payload)
     });
+
     if(res.ok) alert('Applied successfully!');
     else alert('Error applying for job.');
 }
 
 // -------------------- APPLIED JOBS --------------------
 async function loadAppliedJobs(){
-    const res = await fetch(`${BASE_URL}/users/${user.id}/appliedJobs`);
-    const jobs = await res.json();
+    const res = await fetch(`${BASE_URL}/candidates/${user.id}/applications`);
+    const apps = await res.json();
     const container = document.getElementById('dashboardContent');
     container.innerHTML='';
-    if(!jobs || jobs.length===0){ container.innerHTML='<p>No applied jobs</p>'; return;}
 
-    jobs.forEach(job=>{
+    if(!apps || apps.length===0){ 
+        container.innerHTML='<p>No applied jobs</p>'; 
+        return;
+    }
+
+    apps.forEach(app=>{
         const card = document.createElement('div');
         card.className='col-md-4 mb-3';
         card.innerHTML=`
         <div class="card p-3 shadow hover-card">
-            <h5>${job.title}</h5>
-            <p>Company: ${job.company}</p>
-            <p>Status: ${job.status}</p>
-            ${job.status==='shortlisted' ? `<p>Interview: ${new Date(job.interviewDate).toLocaleString()}</p>` : ''}
+            <h5>${app.jobTitle}</h5>
+            <p>Status: ${app.status}</p>
+            ${app.status==='shortlisted' ? `<p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>` : ''}
         </div>`;
         container.appendChild(card);
     });
@@ -111,21 +124,24 @@ async function loadAppliedJobs(){
 
 // -------------------- SHORTLISTED JOBS --------------------
 async function loadShortlistedJobs(){
-    const res = await fetch(`${BASE_URL}/users/${user.id}/shortlistedJobs`);
-    const jobs = await res.json();
+    const res = await fetch(`${BASE_URL}/candidates/${user.id}/shortlisted`);
+    const apps = await res.json();
     const container = document.getElementById('dashboardContent');
     container.innerHTML='';
-    if(!jobs || jobs.length===0){ container.innerHTML='<p>No shortlisted jobs</p>'; return;}
 
-    jobs.forEach(job=>{
+    if(!apps || apps.length===0){ 
+        container.innerHTML='<p>No shortlisted jobs</p>'; 
+        return;
+    }
+
+    apps.forEach(app=>{
         const card = document.createElement('div');
         card.className='col-md-4 mb-3';
         card.innerHTML=`
         <div class="card p-3 shadow hover-card">
-            <h5>${job.title}</h5>
-            <p>Company: ${job.company}</p>
-            <p>Interview: ${new Date(job.interviewDate).toLocaleString()}</p>
-            <p><strong>Recruiter:</strong> ${job.recruiterName}</p>
+            <h5>${app.jobTitle}</h5>
+            <p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>
+            <p><strong>Recruiter:</strong> ${app.recruiterId}</p>
         </div>`;
         container.appendChild(card);
     });
@@ -137,13 +153,18 @@ async function loadMessages(){
     const data = await res.json();
     const container = document.getElementById('dashboardContent');
     container.innerHTML='';
-    if(!data.messages || data.messages.length===0){ container.innerHTML='<p>No messages</p>'; return;}
+
+    if(!data.messages || data.messages.length===0){ 
+        container.innerHTML='<p>No messages</p>'; 
+        return;
+    }
+
     data.messages.forEach(msg=>{
         const card = document.createElement('div');
         card.className='col-md-6 mb-3';
         card.innerHTML=`
         <div class="card p-3 shadow hover-card">
-            <p><strong>From:</strong> ${msg.fromName}</p>
+            <p><strong>From:</strong> ${msg.from}</p>
             <p>${msg.message}</p>
             <p><small>${new Date(msg.date).toLocaleString()}</small></p>
         </div>`;
