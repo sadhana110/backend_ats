@@ -59,6 +59,65 @@ def login():
         return jsonify({'message': 'Login success', 'user': user}), 200
     return jsonify({'message': 'Invalid credentials'}), 401
 
+# ------------------ ADMIN ROUTES ------------------
+
+# Get all users (optional filter by role)
+@app.route('/users', methods=['GET'])
+def get_users():
+    role = request.args.get('role')
+    if role:
+        filtered = [u for u in users if u['role'] == role]
+    else:
+        filtered = users
+    return jsonify(filtered), 200
+
+
+# Ban a user
+@app.route('/users/<user_id>/ban', methods=['POST'])
+def ban_user(user_id):
+    global users
+    # Remove user completely (or you can just add a 'banned' flag)
+    user = next((u for u in users if u['id'] == user_id), None)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    users = [u for u in users if u['id'] != user_id]
+    return jsonify({'message': 'User banned successfully'}), 200
+
+
+# Investigate a user (just a placeholder flag)
+@app.route('/users/<user_id>/investigate', methods=['POST'])
+def investigate_user(user_id):
+    user = next((u for u in users if u['id'] == user_id), None)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    # Add investigation flag
+    user['investigation'] = True
+    return jsonify({'message': 'User under investigation'}), 200
+
+
+# Reports (for example, admin can see all job reports)
+reports = []  # global in-memory reports
+
+@app.route('/reports', methods=['GET'])
+def get_reports():
+    return jsonify(reports), 200
+
+@app.route('/reports/<report_id>/resolve', methods=['POST'])
+def resolve_report(report_id):
+    report = next((r for r in reports if r['id'] == report_id), None)
+    if not report:
+        return jsonify({'message': 'Report not found'}), 404
+    report['resolved'] = True
+    return jsonify({'message': 'Report resolved'}), 200
+
+
+# Admin view messages (for admin only)
+@app.route('/admin/messages', methods=['GET'])
+def admin_messages():
+    # Just return all messages for simplicity
+    return jsonify({'messages': messages}), 200
+
+
 
 # ------------------ JOBS ------------------
 @app.route('/jobs', methods=['GET', 'POST'])
