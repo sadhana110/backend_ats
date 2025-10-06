@@ -152,25 +152,45 @@ def recruiter_shortlisted(recruiter_id):
     return jsonify(recruiter_apps)
 
 # ------------------ MESSAGES ------------------
-@app.route('/messages', methods=['GET', 'POST'])
+# Update application schema to include approval status
+# status: applied / shortlisted / rejected
+# approval: pending / approved / blocked
+applications = []   # existing
+messages = []       # existing
+
+# Approve or block candidate
+@app.route('/applications/<app_id>/approve', methods=['POST'])
+def approve_candidate(app_id):
+    for app in applications:
+        if app['id'] == app_id and app['status'] == 'shortlisted':
+            data = request.json
+            app['approval'] = 'approved' if data.get('approve') else 'blocked'
+            return jsonify({'message': f"Candidate {app['approval']} successfully"}), 200
+    return jsonify({'message': 'Application not found or not shortlisted'}), 404
+
+# Send message
+@app.route('/messages', methods=['POST', 'GET'])
 def messages_handler():
     if request.method == 'POST':
         data = request.json
+        # Only allow messaging if candidate is approved
+        app_entry = next((a for a in applications if a['candidateId'] == data['toId'] and a['recruiterId'] == data['fromId']), None)
+        if not app_entry or app_entry.get('approval') != 'approved':
+            return jsonify({'message': 'Cannot send message: Candidate not approved'}), 403
+
         msg = {
             'id': str(uuid.uuid4()),
             'fromId': data['fromId'],
             'toId': data['toId'],
             'message': data['message'],
-            'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            'date': datetime.now().isoformat()
         }
         messages.append(msg)
-        return jsonify({'message': 'Message sent'}), 201
+        return jsonify({'message': 'Message sent successfully'}), 201
 
+    # GET: fetch all messages for a user
     user_id = request.args.get('userId')
-    user_msgs = [
-        {**m, 'fromName': next((u['name'] for u in users if u['id'] == m['fromId']), '')}
-        for m in messages if m['toId'] == user_id or m['fromId'] == user_id
-    ]
+    user_msgs = [m for m in messages if m['toId'] == user_id or m['fromId'] == user_id]
     return jsonify({'messages': user_msgs})
 
 
