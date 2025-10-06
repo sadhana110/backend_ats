@@ -57,11 +57,14 @@ def job_handler():
         job = {
             'id': str(uuid.uuid4()),
             'title': data['title'],
+            'company': data.get('company',''),
+            'role': data.get('role',''),
             'description': data['description'],
             'location': data['location'],
             'expiryDate': data['expiryDate'],
             'recruiterId': data['recruiterId']
         }
+
         jobs.append(job)
         return jsonify({'message': 'Job posted', 'job': job}), 201
 
@@ -88,6 +91,8 @@ def update_job(job_id):
 
     # Update fields
     job['title'] = data.get('title', job['title'])
+    job['company'] = data.get('company', job.get('company', ''))
+    job['role'] = data.get('role', job.get('role', ''))
     job['description'] = data.get('description', job['description'])
     job['location'] = data.get('location', job['location'])
     job['expiryDate'] = data.get('expiryDate', job['expiryDate'])
