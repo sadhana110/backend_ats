@@ -70,6 +70,30 @@ def job_handler():
     active_jobs = [j for j in jobs if j['expiryDate'] >= now]
     return jsonify(active_jobs)
 
+# Get single job by ID
+@app.route('/jobs/<job_id>', methods=['GET'])
+def get_job(job_id):
+    job = next((j for j in jobs if j['id'] == job_id), None)
+    if not job:
+        return jsonify({"message": "Job not found"}), 404
+    return jsonify(job)
+
+# Update job by ID
+@app.route('/jobs/<job_id>', methods=['PUT'])
+def update_job(job_id):
+    data = request.json
+    job = next((j for j in jobs if j['id'] == job_id), None)
+    if not job:
+        return jsonify({"message": "Job not found"}), 404
+
+    # Update fields
+    job['title'] = data.get('title', job['title'])
+    job['description'] = data.get('description', job['description'])
+    job['location'] = data.get('location', job['location'])
+    job['expiryDate'] = data.get('expiryDate', job['expiryDate'])
+
+    return jsonify({'message': 'Job updated', 'job': job})
+
 
 @app.route('/recruiters/<recruiter_id>/jobs', methods=['GET'])
 def recruiter_jobs(recruiter_id):
