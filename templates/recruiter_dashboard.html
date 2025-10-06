@@ -244,15 +244,25 @@ function sendMessage(candidateId){
     const message = prompt('Enter your message:');
     if(!message) return;
     fetch(`${BASE_URL}/messages`,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({from:user.id,to:candidateId,message})
-    }).then(res=>{
-        if(res.ok) alert('Message sent');
-        else alert('Failed to send message');
-    }).catch(err=>{
-        alert('Server error: ' + err);
-    });
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+        fromId: user.id, 
+        toId: candidateId,
+        message: message
+    })
+})
+.then(res => res.json())
+.then(result => {
+    if(res.ok){
+        alert(result.message);
+        loadMessages(); // reload messages if needed
+    } else {
+        alert('Failed to send message: ' + result.message);
+    }
+})
+.catch(err => alert('Server error: ' + err));
+
 }
 </script>
 </body>
