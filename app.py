@@ -125,23 +125,24 @@ def recruiter_applications(recruiter_id):
 
 
 # -------------------- SHORTLIST / REJECT --------------------
-@app.route('/applications/<app_id>/shortlist', methods=['POST'])
+@app.route('/applications/<int:app_id>/shortlist', methods=['POST'])
 def shortlist_application(app_id):
-    for a in applications:
-        if a['id'] == app_id:
-            a['status'] = 'shortlisted'
-            a['interviewDate'] = (datetime.now() + timedelta(days=2)).isoformat()
-            return jsonify({'message': 'Candidate shortlisted successfully'}), 200
+    for app in applications:
+        if app['id'] == app_id:
+            app['status'] = 'shortlisted'
+            app['interviewDate'] = datetime.now().isoformat()
+            return jsonify({'message': 'Applicant shortlisted successfully'}), 200
     return jsonify({'message': 'Application not found'}), 404
 
 
-@app.route('/applications/<app_id>/reject', methods=['POST'])
+@app.route('/applications/<int:app_id>/reject', methods=['POST'])
 def reject_application(app_id):
-    for a in applications:
-        if a['id'] == app_id:
-            a['status'] = 'rejected'
-            return jsonify({'message': 'Candidate rejected'}), 200
+    for app in applications:
+        if app['id'] == app_id:
+            app['status'] = 'rejected'
+            return jsonify({'message': 'Applicant rejected successfully'}), 200
     return jsonify({'message': 'Application not found'}), 404
+
 
 
 # -------------------- RECRUITER SHORTLISTED VIEW --------------------
