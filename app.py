@@ -125,7 +125,7 @@ def recruiter_applications(recruiter_id):
 
 
 # -------------------- SHORTLIST / REJECT --------------------
-@app.route('/applications/<int:app_id>/shortlist', methods=['POST'])
+@app.route('/applications/<app_id>/shortlist', methods=['POST'])
 def shortlist_application(app_id):
     for app in applications:
         if app['id'] == app_id:
@@ -135,7 +135,7 @@ def shortlist_application(app_id):
     return jsonify({'message': 'Application not found'}), 404
 
 
-@app.route('/applications/<int:app_id>/reject', methods=['POST'])
+@app.route('/applications/<app_id>/reject', methods=['POST'])
 def reject_application(app_id):
     for app in applications:
         if app['id'] == app_id:
