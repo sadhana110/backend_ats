@@ -213,7 +213,7 @@ async function loadShortlistedApplicants(){
             <p><strong>Candidate:</strong> ${app.candidateName}</p>
             <p><strong>Job:</strong> ${app.jobTitle}</p>
             <p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>
-            <button class="btn btn-info btn-sm" onclick="sendMessage(${app.candidateId})">Message</button>
+            <button class="btn btn-info btn-sm" onclick="sendMessage('${app.candidateId}')">Message</button>
         </div>`;
         container.appendChild(card);
     });
@@ -250,6 +250,8 @@ function sendMessage(candidateId){
     }).then(res=>{
         if(res.ok) alert('Message sent');
         else alert('Failed to send message');
+    }).catch(err=>{
+        alert('Server error: ' + err);
     });
 }
 </script>
