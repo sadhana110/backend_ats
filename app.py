@@ -193,29 +193,36 @@ def messages_handler():
     user_msgs = [m for m in messages if m['toId'] == user_id or m['fromId'] == user_id]
     return jsonify({'messages': user_msgs})
 
+# -------------------- RECRUITER MESSAGE HANDLER --------------------
 @app.route('/recruiter/messages', methods=['GET', 'POST'])
 def recruiter_messages():
     """
-    GET: Fetch all messages for this recruiter.
-    POST: Send message from recruiter to candidate (only if approved).
+    GET: Fetch all messages for this recruiter (optionally filtered by candidateId)
+    POST: Send a message from recruiter to candidate (only if approved).
     """
     if request.method == 'POST':
-        data = request.json
-        # Check approval
+        data = request.get_json()
+
+        # Verify approval before allowing recruiter to message candidate
         app_entry = next(
-            (a for a in applications
-             if a['candidateId'] == data['toId'] and a['recruiterId'] == data['fromId']
-             and a.get('status') == 'shortlisted' and a.get('approval') == 'approved'),
+            (
+                a for a in applications
+                if a['candidateId'] == data['toId']
+                and a['recruiterId'] == data['fromId']
+                and a.get('status') == 'shortlisted'
+                and a.get('approval') == 'approved'
+            ),
             None
         )
         if not app_entry:
-            return jsonify({'message': 'Cannot send message: Candidate not approved'}), 403
+            return jsonify({'message': 'Cannot send message: Candidate not approved yet'}), 403
 
+        # Create message
         msg = {
             'id': str(uuid.uuid4()),
             'fromId': data['fromId'],
-            'fromName': data.get('fromName'),
-            'fromEmail': data.get('fromEmail'),
+            'fromName': data.get('fromName', ''),
+            'fromEmail': data.get('fromEmail', ''),
             'toId': data['toId'],
             'toName': data.get('toName', ''),
             'message': data['message'],
@@ -224,9 +231,24 @@ def recruiter_messages():
         messages.append(msg)
         return jsonify({'message': 'Message sent successfully'}), 201
 
-    # GET messages for recruiter
+    # -------------------- GET Messages --------------------
     recruiter_id = request.args.get('recruiterId')
-    recruiter_msgs = [m for m in messages if m['toId'] == recruiter_id or m['fromId'] == recruiter_id]
+    candidate_id = request.args.get('candidateId')
+
+    recruiter_msgs = [
+        m for m in messages
+        if recruiter_id in (m['fromId'], m['toId'])
+    ]
+
+    # If candidateId is provided → show conversation between both
+    if candidate_id:
+        recruiter_msgs = [
+            m for m in recruiter_msgs
+            if candidate_id in (m['fromId'], m['toId'])
+        ]
+
+    # Sort by date for proper chat order
+    recruiter_msgs.sort(key=lambda x: x['date'])
     return jsonify({'messages': recruiter_msgs})
 
 
