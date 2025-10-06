@@ -193,6 +193,44 @@ def messages_handler():
     user_msgs = [m for m in messages if m['toId'] == user_id or m['fromId'] == user_id]
     return jsonify({'messages': user_msgs})
 
+# -------------------- CANDIDATE MESSAGES --------------------
+@app.route('/candidate/messages', methods=['GET', 'POST'])
+def candidate_messages():
+    """
+    GET: Fetch all messages for this candidate.
+    POST: Send message from candidate to a recruiter (only if approved).
+    """
+    if request.method == 'POST':
+        data = request.json
+        # Check if candidate is approved for this recruiter
+        app_entry = next(
+            (a for a in applications
+             if a['candidateId'] == data['fromId'] and a['recruiterId'] == data['toId']
+             and a.get('status') == 'shortlisted'),
+            None
+        )
+        if not app_entry:
+            return jsonify({'message': 'Cannot send message: Not approved or not shortlisted'}), 403
+
+        msg = {
+            'id': str(uuid.uuid4()),
+            'fromId': data['fromId'],
+            'fromName': data.get('fromName'),
+            'fromEmail': data.get('fromEmail'),
+            'toId': data['toId'],
+            'toName': data.get('toName', ''),
+            'message': data['message'],
+            'date': datetime.now().isoformat()
+        }
+        messages.append(msg)
+        return jsonify({'message': 'Message sent successfully'}), 201
+
+    # GET messages for candidate
+    candidate_id = request.args.get('candidateId')
+    candidate_msgs = [m for m in messages if m['toId'] == candidate_id or m['fromId'] == candidate_id]
+    return jsonify({'messages': candidate_msgs})
+
+
 
 # ------------------ INTERVIEWS ------------------
 @app.route('/interviews', methods=['POST', 'GET'])
