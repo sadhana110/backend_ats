@@ -7,7 +7,18 @@ app = Flask(__name__)
 CORS(app)  # allow cross-origin requests
 
 # ------------------ IN-MEMORY DATA ------------------
-users = []          # {id,name,email,password,role,extra_info}
+users = []
+# Pre-create an admin user
+admin_user = {
+    'id': str(uuid.uuid4()),
+    'name': 'Admin',
+    'email': 'admin@example.com',
+    'password': 'admin123',   # <-- this is the admin password
+    'role': 'admin',
+    'extra_info': {}
+}
+users.append(admin_user)
+# {id,name,email,password,role,extra_info}
 jobs = []           # {id,title,description,location,expiryDate,recruiterId}
 applications = []   # {id,candidateId,jobId,status,jobTitle,recruiterId}
 shortlisted = []    # {id,candidateId,jobId}
