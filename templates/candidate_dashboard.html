@@ -69,7 +69,6 @@ async function loadAllJobs(){
         <div class="card p-3 shadow hover-card">
             <h5>${job.title}</h5>
             <p><strong>Location:</strong> ${job.location}</p>
-            <p><strong>Role:</strong> ${job.role}</p>
             <p><strong>Ends:</strong> ${new Date(job.expiryDate).toLocaleDateString()}</p>
             <button class="btn btn-primary btn-sm" onclick="applyJob('${job.id}','${job.title}','${job.recruiterId}')">Apply</button>
         </div>`;
@@ -101,10 +100,10 @@ async function applyJob(jobId, jobTitle, recruiterId) {
             alert("⚠️ " + data.message);
         }
     } catch (err) {
+        console.error(err);
         alert("❌ Server error while applying");
     }
 }
-
 
 // -------------------- APPLIED JOBS --------------------
 async function loadAppliedJobs(){
@@ -125,7 +124,7 @@ async function loadAppliedJobs(){
         <div class="card p-3 shadow hover-card">
             <h5>${app.jobTitle}</h5>
             <p>Status: ${app.status}</p>
-            ${app.status==='shortlisted' ? `<p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>` : ''}
+            ${app.status==='shortlisted' && app.interviewDate ? `<p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>` : ''}
         </div>`;
         container.appendChild(card);
     });
@@ -149,8 +148,8 @@ async function loadShortlistedJobs(){
         card.innerHTML=`
         <div class="card p-3 shadow hover-card">
             <h5>${app.jobTitle}</h5>
-            <p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>
-            <p><strong>Recruiter:</strong> ${app.recruiterId}</p>
+            ${app.interviewDate ? `<p>Interview: ${new Date(app.interviewDate).toLocaleString()}</p>` : ''}
+            <p><strong>Recruiter:</strong> ${app.recruiterName || 'N/A'}</p>
         </div>`;
         container.appendChild(card);
     });
@@ -163,17 +162,19 @@ async function loadMessages(){
     const container = document.getElementById('dashboardContent');
     container.innerHTML='';
 
-    if(!data.messages || data.messages.length===0){ 
+    const msgs = data.messages || data; // handles both backend response styles
+
+    if(!msgs || msgs.length===0){ 
         container.innerHTML='<p>No messages</p>'; 
         return;
     }
 
-    data.messages.forEach(msg=>{
+    msgs.forEach(msg=>{
         const card = document.createElement('div');
         card.className='col-md-6 mb-3';
         card.innerHTML=`
         <div class="card p-3 shadow hover-card">
-            <p><strong>From:</strong> ${msg.from}</p>
+            <p><strong>From:</strong> ${msg.fromName || msg.from || 'Unknown'}</p>
             <p>${msg.message}</p>
             <p><small>${new Date(msg.date).toLocaleString()}</small></p>
         </div>`;
