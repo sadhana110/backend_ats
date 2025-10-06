@@ -82,11 +82,33 @@ def delete_job(job_id):
     global jobs
     jobs = [j for j in jobs if j['id'] != job_id]
     return jsonify({'message': 'Job deleted'}), 200
+
+
+# ------------------ APPLICATIONS ------------------
+# -------------------- APPLY JOB --------------------
+@app.route('/apply', methods=['POST'])
+def apply_job():
+    data = request.json
+    app_entry = {
+        "id": str(uuid.uuid4()),
+        "candidateId": data['candidateId'],
+        "candidateName": data['candidateName'],
+        "jobId": data['jobId'],
+        "jobTitle": data['jobTitle'],
+        "recruiterId": data['recruiterId'],
+        "status": "applied",
+        "appliedDate": datetime.now().isoformat()
+    }
+    applications.append(app_entry)
+    return jsonify({"message": "Application submitted successfully!"}), 201
+
+
 # -------------------- CANDIDATE APPLICATIONS --------------------
 @app.route('/candidates/<candidate_id>/applications')
 def candidate_applications(candidate_id):
     user_apps = [a for a in applications if a['candidateId'] == candidate_id]
     return jsonify(user_apps)
+
 
 # -------------------- CANDIDATE SHORTLISTED JOBS --------------------
 @app.route('/candidates/<candidate_id>/shortlisted')
@@ -94,11 +116,13 @@ def candidate_shortlisted(candidate_id):
     shortlisted = [a for a in applications if a['candidateId'] == candidate_id and a['status'] == 'shortlisted']
     return jsonify(shortlisted)
 
+
 # -------------------- RECRUITER APPLICATIONS --------------------
 @app.route('/recruiters/<recruiter_id>/applications')
 def recruiter_applications(recruiter_id):
     recruiter_apps = [a for a in applications if a['recruiterId'] == recruiter_id]
     return jsonify(recruiter_apps)
+
 
 # -------------------- SHORTLIST / REJECT --------------------
 @app.route('/applications/<app_id>/shortlist', methods=['POST'])
@@ -110,6 +134,7 @@ def shortlist_application(app_id):
             return jsonify({'message': 'Candidate shortlisted successfully'}), 200
     return jsonify({'message': 'Application not found'}), 404
 
+
 @app.route('/applications/<app_id>/reject', methods=['POST'])
 def reject_application(app_id):
     for a in applications:
@@ -118,82 +143,12 @@ def reject_application(app_id):
             return jsonify({'message': 'Candidate rejected'}), 200
     return jsonify({'message': 'Application not found'}), 404
 
+
 # -------------------- RECRUITER SHORTLISTED VIEW --------------------
 @app.route('/recruiters/<recruiter_id>/shortlisted')
 def recruiter_shortlisted(recruiter_id):
     recruiter_apps = [a for a in applications if a['recruiterId'] == recruiter_id and a['status'] == 'shortlisted']
     return jsonify(recruiter_apps)
-
-
-
-# ------------------ APPLICATIONS ------------------
-@app.route('/apply', methods=['POST'])
-def apply_job():
-    data = request.json
-    existing = [a for a in applications if a['candidateId'] == data['candidateId'] and a['jobId'] == data['jobId']]
-    if existing:
-        return jsonify({'message': 'Already applied for this job'}), 400
-
-    application = {
-        'id': str(uuid.uuid4()),
-        'candidateId': data['candidateId'],
-        'candidateName': data['candidateName'],
-        'jobId': data['jobId'],
-        'jobTitle': data['jobTitle'],
-        'recruiterId': data['recruiterId'],
-        'status': 'applied'
-    }
-    applications.append(application)
-    return jsonify({'message': 'Application submitted', 'application': application}), 201
-
-
-@app.route('/recruiters/<recruiter_id>/applications', methods=['GET'])
-def recruiter_applications(recruiter_id):
-    apps = [a for a in applications if a['recruiterId'] == recruiter_id]
-    return jsonify(apps)
-
-
-@app.route('/applications/<app_id>/shortlist', methods=['POST'])
-def shortlist_application(app_id):
-    for app_ in applications:
-        if app_['id'] == app_id:
-            app_['status'] = 'shortlisted'
-            app_['interviewDate'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            shortlisted.append({
-                'id': app_['id'],
-                'candidateId': app_['candidateId'],
-                'jobId': app_['jobId']
-            })
-            return jsonify({'message': 'Applicant shortlisted'}), 200
-    return jsonify({'message': 'Application not found'}), 404
-
-
-@app.route('/applications/<app_id>/reject', methods=['POST'])
-def reject_application(app_id):
-    for app_ in applications:
-        if app_['id'] == app_id:
-            app_['status'] = 'rejected'
-            return jsonify({'message': 'Applicant rejected'}), 200
-    return jsonify({'message': 'Application not found'}), 404
-
-
-@app.route('/recruiters/<recruiter_id>/shortlisted', methods=['GET'])
-def recruiter_shortlisted(recruiter_id):
-    result = [a for a in applications if a['recruiterId'] == recruiter_id and a['status'] == 'shortlisted']
-    return jsonify(result)
-
-
-@app.route('/candidates/<candidate_id>/applications', methods=['GET'])
-def candidate_applications(candidate_id):
-    apps = [a for a in applications if a['candidateId'] == candidate_id]
-    return jsonify(apps)
-
-
-@app.route('/candidates/<candidate_id>/shortlisted', methods=['GET'])
-def candidate_shortlisted(candidate_id):
-    result = [a for a in applications if a['candidateId'] == candidate_id and a['status'] == 'shortlisted']
-    return jsonify(result)
-
 
 # ------------------ MESSAGES ------------------
 @app.route('/messages', methods=['GET', 'POST'])
