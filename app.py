@@ -22,7 +22,8 @@ users.append(admin_user)
 jobs = []           # {id,title,description,location,expiryDate,recruiterId}
 applications = []   # {id,candidateId,jobId,status,jobTitle,recruiterId}
 shortlisted = []    # {id,candidateId,jobId}
-messages = []       # {id,fromId,toId,message,date}
+messages = []  
+reports = [] # {id,fromId,toId,message,date}
 interviews = []     # {id,candidateId,jobId,dateTime,status}
 
 # ------------------ HELPER FUNCTIONS ------------------
@@ -99,7 +100,7 @@ def investigate_user(user_id):
 # ------------------------------
 # Reports (Candidate / Recruiter)
 # ------------------------------
-reports = []  # global in-memory reports
+  # global in-memory reports
 
 @app.route('/reports', methods=['GET'])
 def get_reports():
