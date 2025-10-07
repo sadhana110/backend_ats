@@ -130,11 +130,13 @@ def admin_get_reports():
 
 @app.route('/admin/manage/reports/<report_id>/resolve', methods=['POST'])
 def admin_resolve_report(report_id):
+    print("Resolve request for report_id:", report_id)  # <-- debug
     for r in reports:
         if r['id'] == report_id:
             r['status'] = 'Resolved'
             return jsonify({'message': 'Report resolved'}), 200
     return jsonify({'message': 'Report not found'}), 404
+
 
 @app.route('/admin/manage/reports/<report_id>', methods=['DELETE'])
 def admin_delete_report(report_id):
