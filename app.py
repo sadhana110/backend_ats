@@ -96,28 +96,14 @@ def investigate_user(user_id):
 
 
 # Reports (for example, admin can see all job reports)
+# ------------------------------
+# Reports (Candidate / Recruiter)
+# ------------------------------
 reports = []  # global in-memory reports
 
 @app.route('/reports', methods=['GET'])
 def get_reports():
     return jsonify(reports), 200
-
-@app.route('/reports/<report_id>/resolve', methods=['POST'])
-def resolve_report(report_id):
-    report = next((r for r in reports if r['id'] == report_id), None)
-    if not report:
-        return jsonify({'message': 'Report not found'}), 404
-    report['resolved'] = True
-    return jsonify({'message': 'Report resolved'}), 200
-
-
-# Admin view messages (for admin only)
-@app.route('/admin/messages', methods=['GET'])
-def admin_messages():
-    # Just return all messages for simplicity
-    return jsonify({'messages': messages}), 200
-
-reports = []
 
 @app.route('/reports', methods=['POST'])
 def create_report():
@@ -134,27 +120,34 @@ def create_report():
     return jsonify({'message': 'Report submitted', 'report': report}), 201
 
 
-@app.route('/admin/reports', methods=['GET'])
-def get_reports():
-    return jsonify(reports)
+# ------------------------------
+# Admin Report Management
+# ------------------------------
+@app.route('/admin/manage/reports', methods=['GET'])
+def admin_get_reports():
+    return jsonify(reports), 200
 
-
-@app.route('/admin/reports/<report_id>/resolve', methods=['POST'])
-def resolve_report(report_id):
+@app.route('/admin/manage/reports/<report_id>/resolve', methods=['POST'])
+def admin_resolve_report(report_id):
     for r in reports:
         if r['id'] == report_id:
             r['status'] = 'Resolved'
             return jsonify({'message': 'Report resolved'}), 200
     return jsonify({'message': 'Report not found'}), 404
 
-
-@app.route('/admin/reports/<report_id>', methods=['DELETE'])
-def delete_report(report_id):
+@app.route('/admin/manage/reports/<report_id>', methods=['DELETE'])
+def admin_delete_report(report_id):
     global reports
     reports = [r for r in reports if r['id'] != report_id]
     return jsonify({'message': 'Report deleted'}), 200
 
 
+
+# Admin view messages (for admin only)
+@app.route('/admin/messages', methods=['GET'])
+def admin_messages():
+    # Just return all messages for simplicity
+    return jsonify({'messages': messages}), 200
 
 
 # ------------------ JOBS ------------------
