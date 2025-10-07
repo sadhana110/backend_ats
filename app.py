@@ -117,6 +117,44 @@ def admin_messages():
     # Just return all messages for simplicity
     return jsonify({'messages': messages}), 200
 
+reports = []
+
+@app.route('/reports', methods=['POST'])
+def create_report():
+    data = request.json
+    report = {
+        'id': str(uuid.uuid4()),
+        'reporterId': data['reporterId'],
+        'targetId': data['targetId'],
+        'targetType': data['targetType'],  # 'candidate' or 'job'
+        'description': data['description'],
+        'status': 'Pending'
+    }
+    reports.append(report)
+    return jsonify({'message': 'Report submitted', 'report': report}), 201
+
+
+@app.route('/admin/reports', methods=['GET'])
+def get_reports():
+    return jsonify(reports)
+
+
+@app.route('/admin/reports/<report_id>/resolve', methods=['POST'])
+def resolve_report(report_id):
+    for r in reports:
+        if r['id'] == report_id:
+            r['status'] = 'Resolved'
+            return jsonify({'message': 'Report resolved'}), 200
+    return jsonify({'message': 'Report not found'}), 404
+
+
+@app.route('/admin/reports/<report_id>', methods=['DELETE'])
+def delete_report(report_id):
+    global reports
+    reports = [r for r in reports if r['id'] != report_id]
+    return jsonify({'message': 'Report deleted'}), 200
+
+
 
 
 # ------------------ JOBS ------------------
